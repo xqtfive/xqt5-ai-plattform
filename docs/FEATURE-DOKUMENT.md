@@ -311,6 +311,9 @@ Durchschnittliche Similarity-Scores und Retrieval-Trefferquote über die Zeit.
 **Kostenaufschlüsselung nach Pool**
 Im Admin-Dashboard: welcher Pool verursacht wie viele Embedding- und LLM-Kosten — für interne Verrechnung oder Budgetkontrolle.
 
+**Dynamische Preistabelle für Token-Kosten**
+Die Preise pro Modell (Input/Output in USD pro 1M Tokens) sind aktuell hardcodiert in `backend/app/token_tracking.py` (`COST_PER_1M_TOKENS`). Änderungen erfordern ein Code-Edit + Deployment. Geplant: DB-Tabelle `app_model_pricing` zur Verwaltung über das Admin-Dashboard, ohne Codeänderung.
+
 ---
 
 ### KI-Features
