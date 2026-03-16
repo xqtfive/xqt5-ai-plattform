@@ -180,6 +180,9 @@ Webseite per URL in einen Pool laden. Text wird extrahiert (Crawl + HTML-Parsing
 **Globaler Wissenspool**
 Admin-verwalteter Pool der bei jeder RAG-Suche automatisch mitläuft — ohne dass der User ihn explizit auswählen muss. Geeignet für unternehmensweite Richtlinien, FAQs, Handbücher.
 
+**GraphRAG — Wissengraph-gestütztes Retrieval**
+Ergänzung des bestehenden Chunk-Retrievals um einen Wissensgraphen: Beim Dokument-Upload extrahiert ein LLM-Schritt Entitäten (Personen, Unternehmen, Projekte, Orte) und ihre Beziehungen. Diese werden als Graph in PostgreSQL (via `age`-Extension oder separater Graph-DB wie Neo4j) gespeichert. Bei der RAG-Suche wird neben dem Vektor-/BM25-Retrieval auch der Graph traversiert — so lassen sich Beziehungsfragen beantworten ("Welche Projekte verbinden Person X mit Unternehmen Y?"), die reines Chunk-Retrieval nicht zuverlässig löst. Beide Ergebnisquellen werden per RRF zusammengeführt. Besonders wertvoll für Unternehmensstrukturen, Vertragsnetze und Projektzusammenhänge.
+
 ---
 
 ### Lokale Modelle (On-Premise LLM)
