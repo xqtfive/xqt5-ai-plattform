@@ -182,6 +182,22 @@ Admin-verwalteter Pool der bei jeder RAG-Suche automatisch mitläuft — ohne da
 
 ---
 
+### Lokale Modelle (On-Premise LLM)
+
+**Ollama-Integration**
+Ollama stellt lokal laufende Open-Source-Modelle (Llama, Mistral, Qwen, Gemma u. a.) über eine OpenAI-kompatible REST-API bereit. Integration über einen konfigurierbaren `base_url`-Parameter in `llm.py` — kein neuer Provider-Code nötig, da Ollama das OpenAI-Format spricht. Admin trägt die Ollama-URL (z. B. `http://ollama:11434`) im Provider-Tab ein; Modelle werden über `/api/tags` abgerufen und in `app_model_config` importiert.
+
+**LocalAI / vLLM / LM Studio**
+Weitere OpenAI-kompatible Serving-Backends (LocalAI, vLLM, LM Studio Server) können analog zu Ollama eingebunden werden — gleicher Mechanismus, nur andere `base_url`. Ermöglicht GPU-beschleunigtes Serving auf eigener Hardware ohne Cloud-Abhängigkeit.
+
+**Datenschutz-Modus**
+Admin kann einzelne Modelle als "lokal" kennzeichnen (`is_local` Flag in `app_model_config`). Für Datenschutz-sensible Konversationen kann erzwungen werden, dass nur lokale Modelle verwendbar sind — Cloud-Provider werden für diese Chats gesperrt.
+
+**Embedding-Modelle lokal**
+Neben Chat-Modellen können auch Embedding-Modelle lokal betrieben werden (z. B. `nomic-embed-text` via Ollama). Konfigurierbar als dritter Embedding-Provider neben OpenAI und Azure OpenAI im Retrieval-Tab des Admin-Dashboards.
+
+---
+
 ### Dokumentformate
 
 **Word (.docx)**
