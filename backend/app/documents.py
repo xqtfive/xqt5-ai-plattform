@@ -78,8 +78,13 @@ async def _ocr_pdf_mistral_with_assets(
     filename: str,
     user_id: Optional[str] = None,
 ) -> Tuple[str, List[Dict[str, Any]]]:
-    """Run OCR on a PDF via the Mistral OCR API and return text + image assets."""
+    """Run OCR on a PDF via the Mistral OCR API and return text + image assets.
+
+    Large PDFs are automatically split into batches of 20 pages to stay within
+    Mistral's 131k token context limit.
+    """
     from . import providers as providers_mod
+    from .token_tracking import record_usage
 
     api_key = providers_mod.get_api_key("mistral")
     if not api_key:
@@ -88,9 +93,73 @@ async def _ocr_pdf_mistral_with_assets(
             "Bitte Key unter Admin > Provider hinterlegen."
         )
 
-    b64 = base64.b64encode(file_bytes).decode("ascii")
-    document_url = f"data:application/pdf;base64,{b64}"
-    return await _mistral_ocr_document_with_assets(api_key, document_url, filename, len(file_bytes), user_id=user_id)
+    batches = _split_pdf_into_batches(file_bytes, batch_size=20)
+
+    if len(batches) == 1:
+        b64 = base64.b64encode(file_bytes).decode("ascii")
+        document_url = f"data:application/pdf;base64,{b64}"
+        return await _mistral_ocr_document_with_assets(api_key, document_url, filename, len(file_bytes), user_id=user_id)
+
+    logger.info("PDF %s split into %d batches for OCR", filename, len(batches))
+    all_text_parts: List[str] = []
+    all_assets: List[Dict[str, Any]] = []
+
+    for batch_bytes, page_offset in batches:
+        b64 = base64.b64encode(batch_bytes).decode("ascii")
+        document_url = f"data:application/pdf;base64,{b64}"
+        raw = await _mistral_ocr_document_raw(api_key, document_url, filename, len(batch_bytes))
+
+        # Shift page indices so <!-- page:N --> markers reflect the absolute page number
+        for page in raw.get("pages", []) or []:
+            if isinstance(page.get("index"), int):
+                page["index"] += page_offset
+
+        text, assets = _extract_text_and_assets_from_mistral_response(raw)
+        if text:
+            all_text_parts.append(text)
+        all_assets.extend(assets)
+
+        if user_id:
+            page_count = max(1, len(raw.get("pages", []) or []))
+            record_usage(user_id=user_id, chat_id=None, model="mistral-ocr-latest",
+                         provider="mistral", prompt_tokens=page_count, completion_tokens=0)
+
+    return "\n\n".join(all_text_parts), all_assets
+
+
+def _split_pdf_into_batches(file_bytes: bytes, batch_size: int = 20) -> List[Tuple[bytes, int]]:
+    """Split a PDF into page batches. Returns list of (batch_bytes, page_offset).
+
+    Falls back to [(file_bytes, 0)] if pypdf is unavailable or the PDF cannot be parsed.
+    """
+    import io
+    try:
+        from pypdf import PdfReader, PdfWriter
+    except ImportError:
+        return [(file_bytes, 0)]
+
+    try:
+        reader = PdfReader(io.BytesIO(file_bytes))
+        total_pages = len(reader.pages)
+    except Exception:
+        return [(file_bytes, 0)]
+
+    if total_pages <= batch_size:
+        return [(file_bytes, 0)]
+
+    batches: List[Tuple[bytes, int]] = []
+    for start in range(0, total_pages, batch_size):
+        end = min(start + batch_size, total_pages)
+        writer = PdfWriter()
+        for i in range(start, end):
+            writer.add_page(reader.pages[i])
+        buf = io.BytesIO()
+        writer.write(buf)
+        batches.append((buf.getvalue(), start))
+
+    logger.info("Split PDF into %d batches (total %d pages, batch_size=%d)",
+                len(batches), total_pages, batch_size)
+    return batches
 
 
 async def _ocr_image_mistral(
@@ -854,6 +923,23 @@ def create_document_assets(
     return len(result.data or [])
 
 
+async def _mistral_ocr_document_raw(
+    api_key: str,
+    document_url: str,
+    filename: str,
+    byte_length: int,
+) -> Dict[str, Any]:
+    """Call Mistral OCR and return the raw response dict."""
+    logger.info("OCR via Mistral for %s (%d bytes)", filename, byte_length)
+    payload_variants = [
+        _build_mistral_payload_document(document_url, include_type=True, include_structured=True, include_image_base64=True),
+        _build_mistral_payload_document(document_url, include_type=False, include_structured=True, include_image_base64=True),
+        _build_mistral_payload_document(document_url, include_type=False, include_structured=False, include_image_base64=True),
+        _build_mistral_payload_document(document_url, include_type=False, include_structured=False, include_image_base64=False),
+    ]
+    return await _mistral_ocr_with_fallbacks(api_key, payload_variants, filename, mode="document")
+
+
 async def _mistral_ocr_document_with_assets(
     api_key: str,
     document_url: str,
@@ -863,34 +949,7 @@ async def _mistral_ocr_document_with_assets(
 ) -> Tuple[str, List[Dict[str, Any]]]:
     from .token_tracking import record_usage
 
-    logger.info("OCR via Mistral for %s (%d bytes)", filename, byte_length)
-    payload_variants = [
-        _build_mistral_payload_document(
-            document_url,
-            include_type=True,
-            include_structured=True,
-            include_image_base64=True,
-        ),
-        _build_mistral_payload_document(
-            document_url,
-            include_type=False,
-            include_structured=True,
-            include_image_base64=True,
-        ),
-        _build_mistral_payload_document(
-            document_url,
-            include_type=False,
-            include_structured=False,
-            include_image_base64=True,
-        ),
-        _build_mistral_payload_document(
-            document_url,
-            include_type=False,
-            include_structured=False,
-            include_image_base64=False,
-        ),
-    ]
-    data = await _mistral_ocr_with_fallbacks(api_key, payload_variants, filename, mode="document")
+    data = await _mistral_ocr_document_raw(api_key, document_url, filename, byte_length)
     text, assets = _extract_text_and_assets_from_mistral_response(data)
 
     if user_id:
