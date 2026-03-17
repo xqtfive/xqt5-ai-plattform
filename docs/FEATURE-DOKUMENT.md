@@ -362,5 +362,11 @@ Nutzer-Daten-Export (alle Konversationen, Dokumente, Nutzungsdaten) und vollstä
 **Compliance-Modus**
 Konfigurierbar: bestimmte LLM-Provider sperren (z. B. nur EU-Hosting), Audit-Pflicht für alle KI-Antworten.
 
+**Audit-Log: Pool- und Dokument-Ereignisse**
+Aktuell werden nur Auth-, Admin- und Chat-Ereignisse protokolliert. Pool-Aktionen (Pool erstellen/löschen, Mitglieder einladen, Dokument hochladen/löschen, Pool-Chat-Nachrichten) sind noch nicht im Audit-Log erfasst. Geplant: Neue Action-Konstanten in `audit.py` (`pool.create`, `pool.delete`, `pool.member.add`, `pool.member.remove`, `pool.document.upload`, `pool.document.delete`, `pool.message.send`) und entsprechende `log_event()`-Aufrufe in den Pool-Endpoints.
+
+**Audit-Log per Env-Variable aktivierbar/deaktivierbar**
+Das Audit-Logging soll über eine Coolify-Umgebungsvariable (`AUDIT_LOG_ENABLED=true/false`, Default `true`) steuerbar sein — ohne Code-Änderung oder Neudeployment. Wenn `AUDIT_LOG_ENABLED=false`, überspringt `audit.log_event()` den DB-Write vollständig (kein Overhead, kein Fehler). Konfiguration erfolgt ausschließlich über Coolify, nicht über das Admin-Dashboard.
+
 **SSO (OIDC/SAML)**
 Anbindung an Unternehmens-Identity-Provider (Azure AD, Okta, Google Workspace) für Single Sign-On und automatische Rollenvergabe.
