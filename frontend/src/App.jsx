@@ -239,6 +239,53 @@ export default function App() {
     }
   }
 
+  async function handleWelcomeSend(content) {
+    setLoading(true)
+    setError('')
+    try {
+      const created = await api.createConversation('New Conversation', null)
+      setSelectedModel(created.model || defaultModelId)
+      setConversations((prev) => [
+        { id: created.id, created_at: created.created_at, title: created.title, message_count: 0 },
+        ...prev,
+      ])
+      setActiveConversation(created)
+      setActiveSection('chat')
+      // Send the message into the new conversation
+      setStreamingContent('')
+      const optimisticMessages = [{ role: 'user', content }]
+      setActiveConversation((prev) => ({ ...prev, messages: optimisticMessages }))
+      await api.sendMessageStream(
+        created.id,
+        content,
+        created.model || defaultModelId,
+        temperature,
+        imageMode,
+        (delta) => { setStreamingContent((prev) => (prev || '') + delta) },
+        async (fullContent, sources, imageSources) => {
+          setStreamingContent(null)
+          setLoading(false)
+          const updated = await api.getConversation(created.id)
+          if (updated.messages) {
+            const lastMsg = updated.messages[updated.messages.length - 1]
+            if (lastMsg?.role === 'assistant') {
+              if (sources?.length > 0) lastMsg.sources = sources
+              if (imageSources?.length > 0) lastMsg.image_sources = imageSources
+            }
+          }
+          setActiveConversation(updated)
+          await loadConversations()
+          await loadUsage()
+        },
+        (err) => { setStreamingContent(null); setLoading(false); setError(err) }
+      )
+    } catch (e) {
+      setStreamingContent(null)
+      setLoading(false)
+      setError(e.message)
+    }
+  }
+
   async function onSendMessage(content) {
     if (!activeConversation) return
 
@@ -480,6 +527,7 @@ export default function App() {
           templates={templates}
           documents={chatDocuments}
           onSend={onSendMessage}
+          onWelcomeSend={handleWelcomeSend}
           onModelChange={onModelChange}
           onTemperatureChange={onTemperatureChange}
           onImageModeChange={setImageMode}

@@ -560,6 +560,10 @@ body {
   margin-bottom: 8px;
 }
 
+.logo-mark-q {
+  color: var(--color-primary);
+}
+
 .welcome-heading {
   font-size: 28px;
   font-weight: 700;
@@ -567,9 +571,9 @@ body {
   margin: 0;
 }
 
-.welcome-heading span {
-  color: var(--color-primary);
-}
+.wh-orange { color: var(--color-primary); }
+.wh-navy   { color: var(--color-dark); }
+.wh-sub    { font-size: 0.72em; vertical-align: baseline; position: relative; top: 0.1em; }
 
 .welcome-sub {
   font-size: 15px;
@@ -577,20 +581,72 @@ body {
   margin: 0;
 }
 
-.welcome-hint {
-  font-size: 12px;
-  color: #aaa;
-  margin: 8px 0 0;
+/* Welcome inline input */
+.welcome-input-form {
+  width: 100%;
+  max-width: 600px;
+  margin-top: 8px;
 }
 
-.welcome-hint kbd {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 1px 6px;
+.welcome-input-box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--color-white);
+  border: 1.5px solid var(--color-border);
+  border-radius: 14px;
+  padding: 10px 10px 10px 16px;
+  box-shadow: var(--shadow-md);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.welcome-input-box:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(238, 127, 0, 0.12), var(--shadow-md);
+}
+
+.welcome-textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  font-size: 15px;
   font-family: inherit;
-  font-size: 11px;
   color: var(--color-text);
+  background: transparent;
+  line-height: 1.5;
+  min-height: 24px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.welcome-textarea::placeholder {
+  color: var(--color-text-light);
+}
+
+.welcome-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: var(--color-border);
+  color: #aaa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: not-allowed;
+  flex-shrink: 0;
+  transition: background 0.2s, color 0.2s;
+}
+
+.welcome-send-btn--active {
+  background: var(--color-primary);
+  color: var(--color-white);
+  cursor: pointer;
+}
+
+.welcome-send-btn--active:hover {
+  background: var(--color-primary-dark);
 }
 
 /* ── Messages ── */

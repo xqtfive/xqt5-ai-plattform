@@ -15,6 +15,7 @@ export default function ChatArea({
   templates,
   documents,
   onSend,
+  onWelcomeSend,
   onModelChange,
   onTemperatureChange,
   onImageModeChange,
@@ -31,7 +32,7 @@ export default function ChatArea({
     return (
       <main className="chat-area">
         {error && <p className="error-banner">{error}</p>}
-        <Welcome />
+        <Welcome onSend={onWelcomeSend} loading={loading} />
       </main>
     )
   }
