@@ -2473,6 +2473,12 @@ body {
   flex-direction: column;
   background: var(--color-white);
   overflow: hidden;
+  margin-left: 220px;
+  transition: margin-left 0.2s ease;
+}
+
+.app--sidebar .pool-detail {
+  margin-left: 0;
 }
 
 /* ── Pool Nav Panel (in Sidebar) ── */
@@ -3012,14 +3018,18 @@ body {
 .pool-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 80px 24px calc(220px + 80px);
+  padding: 24px 80px 24px 80px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  transition: padding-left 0.2s ease;
 }
 
-.app--sidebar .pool-messages {
+/* pool-detail already handles the 220px offset via margin-left compensation */
+.pool-detail .input-form {
+  padding-left: 80px;
+  transition: none;
+}
+.app--sidebar .pool-detail .input-form {
   padding-left: 80px;
 }
 
