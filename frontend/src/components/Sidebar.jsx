@@ -3,6 +3,7 @@ import CreatePoolDialog from './CreatePoolDialog'
 import UsageWidget from './UsageWidget'
 
 export default function Sidebar({
+  open,
   section,
   conversations,
   pools,
@@ -38,9 +39,11 @@ export default function Sidebar({
   }
 
   // ── Chat Section ──────────────────────────────────────────────────────────
+  const panelClass = `content-panel${open ? '' : ' content-panel--hidden'}`
+
   if (section === 'chat') {
     return (
-      <div className="content-panel">
+      <div className={panelClass}>
         <div className="content-panel-header">
           <span className="content-panel-title">Chats</span>
         </div>
@@ -118,7 +121,7 @@ export default function Sidebar({
 
   // ── Pools Section ─────────────────────────────────────────────────────────
   return (
-    <div className="content-panel">
+    <div className={panelClass}>
       <div className="content-panel-header">
         <span className="content-panel-title">Pools</span>
         <div className="content-panel-header-actions">
