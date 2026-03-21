@@ -566,6 +566,12 @@ body {
   padding: 40px 24px;
   text-align: center;
   gap: 12px;
+  margin-left: 240px;
+  transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app--sidebar .welcome {
+  margin-left: 0;
 }
 
 .welcome-logo-mark {
