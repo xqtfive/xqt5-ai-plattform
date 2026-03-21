@@ -249,7 +249,7 @@ body {
 }
 
 .content-panel--hidden {
-  transform: translateX(-105%);
+  transform: translateX(calc(-100% - 56px));
   box-shadow: none;
   pointer-events: none;
 }
