@@ -91,7 +91,7 @@ export default function NavRail({
     <nav className="nav-rail">
       {/* Logo */}
       <div className="nav-rail-logo">
-        <span>XQ</span>
+        XQT<span className="nav-rail-logo-sub">5</span>
       </div>
 
       {/* Navigation */}

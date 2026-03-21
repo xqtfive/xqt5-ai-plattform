@@ -26,7 +26,7 @@ export default function LoginScreen({ onLogin }) {
     <div className="login-screen">
       <div className="login-card">
         <div className="login-logo">
-          <span className="login-logo-mark">XQ</span>
+          <span className="login-logo-mark">XQT<span className="logo-sub">5</span></span>
           <span className="login-logo-name">XQT5 <em>AI</em>-Workplace</span>
         </div>
 
