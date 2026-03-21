@@ -554,40 +554,45 @@ export default function App() {
         onDeletePool={handleDeletePool}
         onLeavePool={handleLeavePool}
       />
-      {showAdmin ? (
-        <AdminDashboard onClose={() => { setShowAdmin(false); setActiveSection('chat'); loadModels() }} currentUser={user} />
-      ) : displayedPool ? (
-        <PoolDetail
-          pool={displayedPool}
-          models={models}
-          selectedModel={selectedModel}
-          user={user}
-          activeTab={poolTab}
-          onTabChange={setPoolTab}
-          onCountsUpdate={setPoolCounts}
-          onError={(msg) => setError(msg)}
-        />
-      ) : (
-        <ChatArea
-          conversation={activeConversation}
-          models={models}
-          selectedModel={selectedModel}
-          temperature={temperature}
-          imageMode={imageMode}
-          loading={loading}
-          streamingContent={streamingContent}
-          error={error}
-          templates={templates}
-          documents={chatDocuments}
-          onSend={onSendMessage}
-          onWelcomeSend={handleWelcomeSend}
-          onModelChange={onModelChange}
-          onTemperatureChange={onTemperatureChange}
-          onImageModeChange={setImageMode}
-          onUpload={handleUploadDocument}
-          onDeleteDocument={handleDeleteDocument}
-        />
-      )}
+      <div
+        style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+        onClick={() => { if (sidebarOpen) setSidebarOpen(false) }}
+      >
+        {showAdmin ? (
+          <AdminDashboard onClose={() => { setShowAdmin(false); setActiveSection('chat'); loadModels() }} currentUser={user} />
+        ) : displayedPool ? (
+          <PoolDetail
+            pool={displayedPool}
+            models={models}
+            selectedModel={selectedModel}
+            user={user}
+            activeTab={poolTab}
+            onTabChange={setPoolTab}
+            onCountsUpdate={setPoolCounts}
+            onError={(msg) => setError(msg)}
+          />
+        ) : (
+          <ChatArea
+            conversation={activeConversation}
+            models={models}
+            selectedModel={selectedModel}
+            temperature={temperature}
+            imageMode={imageMode}
+            loading={loading}
+            streamingContent={streamingContent}
+            error={error}
+            templates={templates}
+            documents={chatDocuments}
+            onSend={onSendMessage}
+            onWelcomeSend={handleWelcomeSend}
+            onModelChange={onModelChange}
+            onTemperatureChange={onTemperatureChange}
+            onImageModeChange={setImageMode}
+            onUpload={handleUploadDocument}
+            onDeleteDocument={handleDeleteDocument}
+          />
+        )}
+      </div>
 
       {showAssistantManager && (
         <AssistantManager
