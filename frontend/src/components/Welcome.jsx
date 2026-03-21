@@ -1,8 +1,12 @@
 export default function Welcome() {
   return (
     <div className="welcome">
-      <h2>Welcome to XQT5 AI-Workplace</h2>
-      <p>Create a new conversation to get started.</p>
+      <div className="welcome-logo-mark">XQ</div>
+      <h2 className="welcome-heading">XQT5 <span>AI</span>-Workplace</h2>
+      <p className="welcome-sub">Wähle ein Gespräch aus oder starte ein neues.</p>
+      <p className="welcome-hint">
+        <kbd>N</kbd> Neues Gespräch &nbsp;·&nbsp; <kbd>Enter</kbd> Senden
+      </p>
     </div>
   )
 }

@@ -25,14 +25,17 @@ export default function LoginScreen({ onLogin }) {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <h1 className="login-logo">XQT5 AI-Workplace</h1>
+        <div className="login-logo">
+          <span className="login-logo-mark">XQ</span>
+          <span className="login-logo-name">XQT5 <em>AI</em>-Workplace</span>
+        </div>
 
         <div className="login-tabs">
           <button
             className={`login-tab ${mode === 'login' ? 'active' : ''}`}
             onClick={() => { setMode('login'); setError('') }}
           >
-            Login
+            Anmelden
           </button>
           <button
             className={`login-tab ${mode === 'register' ? 'active' : ''}`}
@@ -45,35 +48,44 @@ export default function LoginScreen({ onLogin }) {
         {error && <div className="login-error">{error}</div>}
 
         <form onSubmit={handleSubmit} className="login-form">
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            required
-            autoComplete="username"
-          />
-          {mode === 'register' && (
+          <label className="login-label">
+            <span>Benutzername</span>
             <input
-              type="email"
-              placeholder="E-Mail"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
-              autoComplete="email"
+              autoComplete="username"
+              autoFocus
             />
+          </label>
+          {mode === 'register' && (
+            <label className="login-label">
+              <span>E-Mail</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </label>
           )}
-          <input
-            type="password"
-            placeholder="Passwort"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          />
+          <label className="login-label">
+            <span>Passwort</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            />
+          </label>
           <button type="submit" className="login-submit" disabled={loading}>
-            {loading ? '...' : mode === 'login' ? 'Einloggen' : 'Registrieren'}
+            {loading
+              ? <span className="login-spinner" />
+              : mode === 'login' ? 'Einloggen' : 'Konto erstellen'}
           </button>
         </form>
       </div>
