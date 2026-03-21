@@ -785,69 +785,79 @@ body {
 .input-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 20px 18px;
-  border-top: 1px solid var(--color-border);
+  gap: 6px;
+  padding: 10px 16px 16px;
   background: var(--color-white);
   flex-shrink: 0;
 }
 
-/* Toolbar: Modell, Temperatur, Bilder, Templates */
-.input-toolbar {
+/* ── Input Card ── */
+.input-card {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* Haupt-Eingabecontainer */
-.input-container {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 10px 10px 10px 14px;
+  flex-direction: column;
+  gap: 0;
+  border: 1.5px solid var(--color-border);
+  border-radius: 14px;
   background: var(--color-white);
+  box-shadow: var(--shadow-sm);
   transition: border-color var(--transition), box-shadow var(--transition);
+  overflow: hidden;
 }
 
-.input-container:focus-within {
+.input-card:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(238, 127, 0, 0.12);
+  box-shadow: 0 0 0 3px rgba(238, 127, 0, 0.1), var(--shadow-sm);
 }
 
-/* Textarea */
-.message-textarea {
+/* Textarea inside card */
+.input-card-textarea {
   flex: 1;
   border: none;
   outline: none;
   resize: none;
   background: transparent;
-  font-size: 0.875rem;
+  font-size: 15px;
   font-family: inherit;
   color: var(--color-text);
   line-height: 1.6;
-  min-height: 44px;
+  min-height: 24px;
   max-height: 240px;
-  padding: 0;
+  padding: 14px 16px 8px;
   overflow-y: auto;
 }
 
-.message-textarea::placeholder {
+.input-card-textarea::placeholder {
   color: var(--color-text-light);
 }
 
-.message-textarea:disabled {
+.input-card-textarea:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-/* Send-Button (Icon) */
-.send-btn {
+/* Bottom control bar */
+.input-card-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 8px 12px;
+  border-top: 1px solid var(--color-bg);
+}
+
+.input-card-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Send button (inside card bar) */
+.input-send-btn {
   width: 34px;
   height: 34px;
-  border-radius: 8px;
+  border-radius: 50%;
   border: none;
   background: var(--color-border);
   color: var(--color-text-light);
@@ -859,17 +869,17 @@ body {
   transition: background var(--transition), color var(--transition);
 }
 
-.send-btn--active {
-  background: var(--color-primary);
+.input-send-btn--active {
+  background: var(--color-dark);
   color: var(--color-white);
   cursor: pointer;
 }
 
-.send-btn--active:hover {
-  background: var(--color-primary-dark);
+.input-send-btn--active:hover {
+  background: var(--color-primary);
 }
 
-.send-btn:disabled {
+.input-send-btn:disabled {
   cursor: default;
 }
 
@@ -2003,8 +2013,8 @@ body {
 
 .file-upload {
   display: flex;
-  align-items: flex-start;
-  flex-direction: column;
+  align-items: center;
+  flex-direction: row;
   gap: 4px;
 }
 

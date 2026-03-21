@@ -7,7 +7,7 @@ import DocumentList from './DocumentList'
 
 function IconSend() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="12" y1="19" x2="12" y2="5" />
       <polyline points="5 12 12 5 19 12" />
     </svg>
@@ -16,8 +16,8 @@ function IconSend() {
 
 function IconLoading() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-      <circle cx="12" cy="12" r="9" strokeOpacity="0.25" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <circle cx="12" cy="12" r="9" strokeOpacity="0.4" />
       <path d="M12 3a9 9 0 0 1 9 9" style={{ animation: 'spin 0.8s linear infinite' }} />
     </svg>
   )
@@ -57,9 +57,7 @@ export default function MessageInput({
     if (!message.trim() || loading) return
     onSend(message.trim())
     setMessage('')
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-    }
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
 
   function handleKeyDown(e) {
@@ -80,41 +78,11 @@ export default function MessageInput({
 
   return (
     <form className="input-form" onSubmit={handleSubmit}>
-      {/* Toolbar: Modell, Temperatur, Bilder, Templates */}
-      <div className="input-toolbar">
-        <ModelSelector
-          models={models}
-          selectedModel={selectedModel}
-          onChange={onModelChange}
-        />
-        <TemperatureSlider
-          temperature={temperature}
-          onChange={onTemperatureChange}
-        />
-        <select
-          className="toolbar-select"
-          value={imageMode || 'auto'}
-          onChange={(e) => onImageModeChange?.(e.target.value)}
-          title="Bildquellen"
-        >
-          <option value="auto">Bilder: Auto</option>
-          <option value="on">Bilder: Ein</option>
-          <option value="off">Bilder: Aus</option>
-        </select>
-        <TemplatePicker
-          templates={templates}
-          onSelect={handleInsertTemplate}
-        />
-      </div>
-
-      {/* Haupt-Eingabebereich */}
-      <div className="input-container">
-        {chatId && onUpload && (
-          <FileUpload chatId={chatId} onUploadComplete={onUpload} disabled={loading} />
-        )}
+      <div className="input-card">
+        {/* Textarea */}
         <textarea
           ref={textareaRef}
-          className="message-textarea"
+          className="input-card-textarea"
           value={message}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
@@ -122,14 +90,37 @@ export default function MessageInput({
           disabled={loading}
           rows={1}
         />
-        <button
-          className={`send-btn${canSend ? ' send-btn--active' : ''}`}
-          type="submit"
-          disabled={!canSend}
-          title="Senden"
-        >
-          {loading ? <IconLoading /> : <IconSend />}
-        </button>
+
+        {/* Bottom bar */}
+        <div className="input-card-bar">
+          <div className="input-card-bar-left">
+            {chatId && onUpload && (
+              <FileUpload chatId={chatId} onUploadComplete={onUpload} disabled={loading} />
+            )}
+            <TemplatePicker templates={templates} onSelect={handleInsertTemplate} />
+            <ModelSelector models={models} selectedModel={selectedModel} onChange={onModelChange} />
+            <TemperatureSlider temperature={temperature} onChange={onTemperatureChange} />
+            <select
+              className="toolbar-select"
+              value={imageMode || 'auto'}
+              onChange={(e) => onImageModeChange?.(e.target.value)}
+              title="Bildquellen"
+            >
+              <option value="auto">Bilder: Auto</option>
+              <option value="on">Bilder: Ein</option>
+              <option value="off">Bilder: Aus</option>
+            </select>
+          </div>
+
+          <button
+            className={`input-send-btn${canSend ? ' input-send-btn--active' : ''}`}
+            type="submit"
+            disabled={!canSend}
+            title="Senden"
+          >
+            {loading ? <IconLoading /> : <IconSend />}
+          </button>
+        </div>
       </div>
 
       <DocumentList documents={documents} onDelete={onDeleteDocument} />

@@ -3,9 +3,18 @@ import MessageBubble from './MessageBubble'
 
 function IconSend() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="12" y1="19" x2="12" y2="5" />
       <polyline points="5 12 12 5 19 12" />
+    </svg>
+  )
+}
+
+function IconLoading() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+      <circle cx="12" cy="12" r="9" strokeOpacity="0.4" />
+      <path d="M12 3a9 9 0 0 1 9 9" style={{ animation: 'spin 0.8s linear infinite' }} />
     </svg>
   )
 }
@@ -66,26 +75,6 @@ export default function PoolChatArea({
         <span className="pool-chat-title">
           {chat.is_shared ? '🌍' : '🔒'} {chat.title}
         </span>
-        <select
-          className="model-select"
-          value={selectedModel}
-          onChange={(e) => onModelChange(e.target.value)}
-        >
-          {(models || []).map((m) => (
-            <option key={m.id} value={m.id} disabled={!m.available}>
-              {m.display_name || m.name || m.id}
-            </option>
-          ))}
-        </select>
-        <select
-          className="toolbar-select"
-          value={imageMode || 'auto'}
-          onChange={(e) => onImageModeChange?.(e.target.value)}
-        >
-          <option value="auto">Bilder: Auto</option>
-          <option value="on">Bilder: Ein</option>
-          <option value="off">Bilder: Aus</option>
-        </select>
       </div>
 
       <section className="messages pool-messages">
@@ -113,10 +102,11 @@ export default function PoolChatArea({
       </section>
 
       <form className="input-form" onSubmit={handleSubmit}>
-        <div className="input-container">
+        <div className="input-card">
+          {/* Textarea */}
           <textarea
             ref={textareaRef}
-            className="message-textarea"
+            className="input-card-textarea"
             value={input}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
@@ -124,14 +114,43 @@ export default function PoolChatArea({
             disabled={loading}
             rows={1}
           />
-          <button
-            className={`send-btn${canSend ? ' send-btn--active' : ''}`}
-            type="submit"
-            disabled={!canSend}
-            title="Senden"
-          >
-            <IconSend />
-          </button>
+
+          {/* Bottom bar */}
+          <div className="input-card-bar">
+            <div className="input-card-bar-left">
+              <select
+                className="toolbar-select"
+                value={selectedModel}
+                onChange={(e) => onModelChange(e.target.value)}
+                title="Modell"
+              >
+                {(models || []).map((m) => (
+                  <option key={m.id} value={m.id} disabled={!m.available}>
+                    {m.display_name || m.name || m.id}
+                  </option>
+                ))}
+              </select>
+              <select
+                className="toolbar-select"
+                value={imageMode || 'auto'}
+                onChange={(e) => onImageModeChange?.(e.target.value)}
+                title="Bildquellen"
+              >
+                <option value="auto">Bilder: Auto</option>
+                <option value="on">Bilder: Ein</option>
+                <option value="off">Bilder: Aus</option>
+              </select>
+            </div>
+
+            <button
+              className={`input-send-btn${canSend ? ' input-send-btn--active' : ''}`}
+              type="submit"
+              disabled={!canSend}
+              title="Senden"
+            >
+              {loading ? <IconLoading /> : <IconSend />}
+            </button>
+          </div>
         </div>
       </form>
     </div>
