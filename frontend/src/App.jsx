@@ -42,7 +42,8 @@ export default function App() {
 
   // Pools state
   const [pools, setPools] = useState([])
-  const [activePool, setActivePool] = useState(null)
+  const [activePool, setActivePool] = useState(null)      // controls sidebar nav panel
+  const [displayedPool, setDisplayedPool] = useState(null) // controls main content area
   const [poolTab, setPoolTab] = useState('chats')
   const [poolCounts, setPoolCounts] = useState({ docs: 0, chats: 0, members: 0 })
 
@@ -437,6 +438,7 @@ export default function App() {
     setActiveSection(section)
     if (section === 'chat') {
       setActivePool(null)
+      setDisplayedPool(null)
       setShowAdmin(false)
     } else if (section === 'pools') {
       setActiveConversation(null)
@@ -450,6 +452,7 @@ export default function App() {
     setShowAdmin(false)
     setActiveSection('pools')
     setActivePool(pool)
+    setDisplayedPool(pool)
     setPoolTab('chats')
     setSidebarOpen(true)
   }
@@ -459,7 +462,9 @@ export default function App() {
     setError('')
     try {
       await api.deletePool(activePool.id)
-      handleClosePool()
+      setActivePool(null)
+      setDisplayedPool(null)
+      loadPools()
     } catch (e) {
       setError(e.message)
     }
@@ -470,7 +475,9 @@ export default function App() {
     setError('')
     try {
       await api.removePoolMember(activePool.id, user.id)
-      handleClosePool()
+      setActivePool(null)
+      setDisplayedPool(null)
+      loadPools()
     } catch (e) {
       setError(e.message)
     }
@@ -496,6 +503,7 @@ export default function App() {
 
   function handleClosePool() {
     setActivePool(null)
+    // displayedPool intentionally kept — main area stays on last pool
     loadPools()
   }
 
@@ -548,9 +556,9 @@ export default function App() {
       />
       {showAdmin ? (
         <AdminDashboard onClose={() => { setShowAdmin(false); setActiveSection('chat'); loadModels() }} currentUser={user} />
-      ) : activePool ? (
+      ) : displayedPool ? (
         <PoolDetail
-          pool={activePool}
+          pool={displayedPool}
           models={models}
           selectedModel={selectedModel}
           user={user}
