@@ -1389,6 +1389,71 @@ async def admin_test_provider(
     return await providers_mod.test_provider(provider)
 
 
+@app.get("/api/admin/providers/{provider}/models", response_model=None)
+async def admin_list_provider_models(
+    provider: str,
+    admin: Dict = Depends(get_current_admin),
+):
+    """Fetch available models for a given provider from their API."""
+    from .llm import PROVIDER_CONFIG
+    import httpx
+
+    # Mammouth public endpoint — no auth required
+    if provider == "mammouth":
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get("https://api.mammouth.ai/public/models")
+                if resp.status_code != 200:
+                    raise HTTPException(status_code=502, detail=f"Mammouth API error: {resp.status_code}")
+                data = resp.json()
+                models = [
+                    {"id": m["id"], "name": m["id"]}
+                    for m in (data.get("data") or [])
+                    if m.get("object") == "model" and "embedding" not in m["id"]
+                ]
+                return models
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=502, detail="Timeout beim Abrufen der Mammouth-Modelle")
+
+    # OpenAI-compatible providers: fetch from /models
+    config = PROVIDER_CONFIG.get(provider)
+    if not config or "base_url" not in config:
+        raise HTTPException(status_code=400, detail=f"Modell-Liste für Provider '{provider}' nicht unterstützt")
+
+    api_key = providers_mod.get_api_key(provider)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Kein API-Key für diesen Provider konfiguriert")
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            headers = {
+                config.get("auth_header", "Authorization"): f"{config.get('auth_prefix', 'Bearer ')}{api_key}"
+            }
+            if provider == "anthropic":
+                headers["anthropic-version"] = "2023-06-01"
+            if provider == "google":
+                url = f"{config['base_url']}/models?key={api_key}"
+                resp = await client.get(url)
+            else:
+                url = f"{config['base_url']}/models"
+                resp = await client.get(url, headers=headers)
+
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Provider API error: {resp.status_code}")
+
+            data = resp.json()
+            # OpenAI-style response
+            if "data" in data:
+                models = [{"id": m["id"], "name": m.get("id", m["id"])} for m in data["data"]]
+            elif "models" in data:
+                models = [{"id": m.get("name", m.get("id", "")), "name": m.get("displayName", m.get("name", ""))} for m in data["models"]]
+            else:
+                models = []
+            return models
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=502, detail="Timeout beim Abrufen der Modelle")
+
+
 @app.get("/api/admin/audit-logs", response_model=None)
 async def admin_get_audit_logs(
     limit: int = 100,

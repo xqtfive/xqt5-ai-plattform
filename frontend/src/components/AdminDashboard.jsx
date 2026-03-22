@@ -637,13 +637,16 @@ function RetrievalTab() {
 
 function ModelsTab() {
   const [models, setModels] = useState([])
+  const [providers, setProviders] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ model_id: '', provider: '', display_name: '', sort_order: 0, deployment_name: '' })
+  const [form, setForm] = useState({ provider: '', model_id: '', display_name: '', sort_order: 0, deployment_name: '' })
+  const [providerModels, setProviderModels] = useState([])
+  const [loadingProviderModels, setLoadingProviderModels] = useState(false)
 
   useEffect(() => {
-    loadModels()
+    Promise.all([loadModels(), loadProviders()])
   }, [])
 
   async function loadModels() {
@@ -655,6 +658,36 @@ function ModelsTab() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function loadProviders() {
+    try {
+      const data = await api.adminListProviders()
+      setProviders(data.filter((p) => p.source !== 'none'))
+    } catch {}
+  }
+
+  async function handleProviderChange(provider) {
+    setForm({ provider, model_id: '', display_name: '', sort_order: form.sort_order, deployment_name: '' })
+    setProviderModels([])
+    if (!provider) return
+    setLoadingProviderModels(true)
+    try {
+      const data = await api.adminListProviderModels(provider)
+      setProviderModels(data)
+    } catch {
+      setProviderModels([])
+    } finally {
+      setLoadingProviderModels(false)
+    }
+  }
+
+  function handleModelSelect(modelId) {
+    setForm((f) => ({
+      ...f,
+      model_id: `${f.provider}/${modelId}`,
+      display_name: modelId,
+    }))
   }
 
   async function handleToggle(id, field, value) {
@@ -695,7 +728,8 @@ function ModelsTab() {
       const payload = { ...form }
       if (!payload.deployment_name) delete payload.deployment_name
       await api.adminCreateModel(payload)
-      setForm({ model_id: '', provider: '', display_name: '', sort_order: 0, deployment_name: '' })
+      setForm({ provider: '', model_id: '', display_name: '', sort_order: 0, deployment_name: '' })
+      setProviderModels([])
       setShowForm(false)
       await loadModels()
     } catch (err) {
@@ -705,11 +739,13 @@ function ModelsTab() {
 
   if (loading) return <div className="admin-loading">Laden...</div>
 
+  const selectedModelId = form.model_id ? form.model_id.split('/').slice(1).join('/') : ''
+
   return (
     <div>
       {error && <div className="admin-error">{error}</div>}
 
-      <button className="btn btn-primary btn-small" onClick={() => setShowForm(!showForm)} style={{ marginBottom: 16 }}>
+      <button className="btn btn-primary btn-small" onClick={() => { setShowForm(!showForm); setProviderModels([]) }} style={{ marginBottom: 16 }}>
         {showForm ? 'Abbrechen' : 'Neues Modell'}
       </button>
 
@@ -717,20 +753,39 @@ function ModelsTab() {
         <form className="admin-model-form" onSubmit={handleCreate}>
           <div className="form-row">
             <div className="form-group">
-              <label>Model ID</label>
-              <input className="form-input" placeholder="provider/model-name" value={form.model_id}
-                onChange={(e) => setForm({ ...form, model_id: e.target.value })} required />
+              <label>Provider</label>
+              <select className="form-input" value={form.provider}
+                onChange={(e) => handleProviderChange(e.target.value)} required>
+                <option value="">Provider wählen…</option>
+                {providers.map((p) => (
+                  <option key={p.provider} value={p.provider}>{p.display_name}</option>
+                ))}
+              </select>
             </div>
             <div className="form-group">
-              <label>Provider</label>
-              <input className="form-input" placeholder="openai" value={form.provider}
-                onChange={(e) => setForm({ ...form, provider: e.target.value })} required />
+              <label>Modell</label>
+              {providerModels.length > 0 ? (
+                <select className="form-input" value={selectedModelId}
+                  onChange={(e) => handleModelSelect(e.target.value)} required>
+                  <option value="">Modell wählen…</option>
+                  {providerModels.map((m) => (
+                    <option key={m.id} value={m.id}>{m.id}</option>
+                  ))}
+                </select>
+              ) : (
+                <input className="form-input"
+                  placeholder={loadingProviderModels ? 'Lade Modelle…' : form.provider ? 'model-name' : '— erst Provider wählen —'}
+                  disabled={loadingProviderModels || !form.provider}
+                  value={selectedModelId}
+                  onChange={(e) => setForm({ ...form, model_id: `${form.provider}/${e.target.value}` })}
+                  required />
+              )}
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
               <label>Display Name</label>
-              <input className="form-input" placeholder="GPT-5.1" value={form.display_name}
+              <input className="form-input" placeholder="Anzeigename" value={form.display_name}
                 onChange={(e) => setForm({ ...form, display_name: e.target.value })} required />
             </div>
             <div className="form-group">
@@ -748,7 +803,9 @@ function ModelsTab() {
               </div>
             </div>
           )}
-          <button className="btn btn-primary btn-small" type="submit">Hinzufügen</button>
+          <button className="btn btn-primary btn-small" type="submit" disabled={!form.model_id || !form.provider}>
+            Hinzufügen
+          </button>
         </form>
       )}
 

@@ -407,6 +407,12 @@ export const api = {
     return response.json()
   },
 
+  async adminListProviderModels(provider) {
+    const response = await authFetch(`${API_BASE}/api/admin/providers/${provider}/models`)
+    if (!response.ok) throw new Error('Konnte Modelle nicht laden')
+    return response.json()
+  },
+
   // Provider Keys
   async adminListProviders() {
     const response = await authFetch(`${API_BASE}/api/admin/providers`)
