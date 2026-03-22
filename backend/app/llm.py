@@ -68,9 +68,23 @@ AVAILABLE_MODELS = [
     {"id": "mistral/mistral-large-latest", "provider": "mistral", "name": "Mistral Large"},
     {"id": "x-ai/grok-4", "provider": "x-ai", "name": "Grok 4"},
     {"id": "mammouth/gpt-5.2", "provider": "mammouth", "name": "Mammouth GPT-5.2"},
+    {"id": "mammouth/gpt-5.2-pro", "provider": "mammouth", "name": "Mammouth GPT-5.2 Pro"},
     {"id": "mammouth/gpt-5.1", "provider": "mammouth", "name": "Mammouth GPT-5.1"},
+    {"id": "mammouth/gpt-5", "provider": "mammouth", "name": "Mammouth GPT-5"},
+    {"id": "mammouth/gpt-5-mini", "provider": "mammouth", "name": "Mammouth GPT-5 Mini"},
+    {"id": "mammouth/gpt-4.1", "provider": "mammouth", "name": "Mammouth GPT-4.1"},
+    {"id": "mammouth/gpt-4.1-mini", "provider": "mammouth", "name": "Mammouth GPT-4.1 Mini"},
+    {"id": "mammouth/claude-opus-4-6", "provider": "mammouth", "name": "Mammouth Claude Opus 4.6"},
+    {"id": "mammouth/claude-sonnet-4-6", "provider": "mammouth", "name": "Mammouth Claude Sonnet 4.6"},
     {"id": "mammouth/claude-sonnet-4-5", "provider": "mammouth", "name": "Mammouth Claude Sonnet 4.5"},
+    {"id": "mammouth/claude-haiku-4-5", "provider": "mammouth", "name": "Mammouth Claude Haiku 4.5"},
+    {"id": "mammouth/gemini-3-pro-preview", "provider": "mammouth", "name": "Mammouth Gemini 3 Pro"},
+    {"id": "mammouth/gemini-2.5-pro", "provider": "mammouth", "name": "Mammouth Gemini 2.5 Pro"},
+    {"id": "mammouth/gemini-2.5-flash", "provider": "mammouth", "name": "Mammouth Gemini 2.5 Flash"},
     {"id": "mammouth/mistral-large-3", "provider": "mammouth", "name": "Mammouth Mistral Large 3"},
+    {"id": "mammouth/deepseek-v3.2", "provider": "mammouth", "name": "Mammouth DeepSeek V3.2"},
+    {"id": "mammouth/deepseek-r1-0528", "provider": "mammouth", "name": "Mammouth DeepSeek R1"},
+    {"id": "mammouth/grok-4-0709", "provider": "mammouth", "name": "Mammouth Grok 4"},
 ]
 
 
