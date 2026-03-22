@@ -1,6 +1,6 @@
 # Anwender-Dokumentation
 
-Stand: 22.02.2026
+Stand: 22.03.2026
 Produkt: **XQT5 AI Plattform**
 
 ## 1. Ziel der Anwendung
@@ -34,14 +34,38 @@ graph TD
     F --> F3["Shared/Private Pool-Chats"]
 ```
 
-## 3. Rollen und Berechtigungen
+## 3. Benutzeroberfläche
 
-### 3.1 Plattform-Rollen
+### 3.1 Aufbau
+
+Die Oberfläche besteht aus drei Bereichen:
+
+| Bereich | Beschreibung |
+|---------|-------------|
+| **NavRail** (ganz links, schmal) | Dauerhafte Navigationsleiste mit Icons für Chats, Pools, Assistenten, Templates und Admin |
+| **Sidebar** (ausklappbar) | Kontextbereich mit Konversations- oder Pool-Liste — erscheint als halbtransparentes Panel über dem Hauptbereich |
+| **Hauptbereich** (rechts) | Chat, Pool-Inhalt oder Welcome-Screen |
+
+### 3.2 Navigation
+
+- **XQT5-Logo** (oben links in der NavRail): Klick kehrt jederzeit zum Welcome-Screen zurück
+- **Chats-Icon**: öffnet die Sidebar mit der Konversationsliste
+- **Pools-Icon**: öffnet die Sidebar mit der Pool-Liste
+- **Assistenten- / Templates-Icon**: öffnet den jeweiligen Manager
+- **Sidebar schließen**: Klick auf den Hauptbereich schließt die Sidebar automatisch; sie schließt sich auch beim Öffnen einer Konversation oder eines Pools
+
+### 3.3 Welcome-Screen
+
+Der Welcome-Screen erscheint beim Start und nach dem Klick aufs Logo. Von hier aus kann direkt eine neue Chat-Frage eingegeben werden — ohne vorher eine Konversation anzulegen.
+
+## 4. Rollen und Berechtigungen
+
+### 4.1 Plattform-Rollen
 
 - **User**: Chat, eigene Dokumente, eigene Assistenten/Templates, Pools nutzen
 - **Admin**: alle User-Rechte plus Admin-Dashboard (Benutzer, Modelle, Provider, Audit)
 
-### 3.2 Pool-Rollen
+### 4.2 Pool-Rollen
 
 ```mermaid
 graph LR
@@ -55,17 +79,17 @@ graph LR
 - **Admin**: zusätzlich Mitglieder und Einladungen verwalten
 - **Owner**: impliziter Pool-Besitzer, kann Pool löschen
 
-## 4. Hauptbereiche im Alltag
+## 5. Hauptbereiche im Alltag
 
-### 4.1 Chat
+### 5.1 Chat
 
-- Neue Konversation erstellen
-- Modell auswählen (z. B. OpenAI, Anthropic, Google, Mistral, xAI, Azure OpenAI)
+- Neue Konversation über die Sidebar (Chats-Icon) oder direkt über den Welcome-Screen starten
+- Modell auswählen (z. B. OpenAI, Anthropic, Google, Mistral, xAI, Azure OpenAI, Mammouth.ai)
 - Temperatur einstellen
 - Streaming-Antworten in Echtzeit
 - Auto-Titel für neue Konversationen
 
-### 4.2 Assistenten
+### 5.2 Assistenten
 
 - Eigene Assistenten mit:
   - Name, Icon, Beschreibung
@@ -73,13 +97,13 @@ graph LR
   - optionalem Modell-/Temperatur-Override
 - Auswahl eines Assistenten startet direkt einen passenden Chat-Kontext
 
-### 4.3 Prompt-Templates
+### 5.3 Prompt-Templates
 
 - Wiederverwendbare Prompt-Bausteine
 - Kategorien und Beschreibung
 - Direkte Einfügung im Nachrichteneingabefeld
 
-### 4.4 Dokumente und RAG
+### 5.4 Dokumente und RAG
 
 - Upload von **PDF**, **TXT** und **Bildern** (`PNG`, `JPG`, `JPEG`, `WEBP`)
 - Automatische Extraktion:
@@ -108,7 +132,7 @@ flowchart TD
     E --> F["Zitat aufklappen (Seite + Textauszug)"]
 ```
 
-### 4.5 Pools (Geteilte Wissenssammlungen)
+### 5.5 Pools (Geteilte Wissenssammlungen)
 
 - Pool erstellen (Name, Beschreibung, Icon, Farbe)
 - Mitglieder per Username hinzufügen
@@ -135,9 +159,9 @@ flowchart LR
     D --> F["Individuelle Antworten"]
 ```
 
-## 5. Typische Arbeitsabläufe
+## 6. Typische Arbeitsabläufe
 
-### 5.1 Wissensarbeit mit eigenen Dokumenten
+### 6.1 Wissensarbeit mit eigenen Dokumenten
 
 1. Neue Konversation starten
 2. Relevante Dokumente hochladen (Fortschrittsbalken abwarten)
@@ -146,7 +170,7 @@ flowchart LR
 5. Antwort inkl. Quellen prüfen — Zitat aufklappen für genauen Textabschnitt und Seitenangabe
 6. Optional Assistent/Template ergänzen
 
-### 5.2 Team-Wissensraum mit Pools
+### 6.2 Team-Wissensraum mit Pools
 
 1. Pool erstellen
 2. Mitglieder einladen (Rolle festlegen)
@@ -156,9 +180,11 @@ flowchart LR
 6. Shared Chat für gemeinsame Diskussion nutzen
 7. Private Chat für persönliche Vertiefung nutzen
 
-## 6. Hinweise für Anwender
+## 7. Hinweise für Anwender
 
-- Welche Modelle verfügbar sind, hängt von der Admin-Konfiguration ab.
-- Bei deaktivierten Benutzern werden Sessions sofort ungültig.
-- Seitenzahlen in Zitaten sind nur bei Dokumenten verfügbar, die nach der letzten Plattform-Aktualisierung hochgeladen oder neu verarbeitet wurden.
-- Falls keine automatische Zusammenfassung erscheint oder ein Modell fehlt, bitte den Admin kontaktieren.
+- **Modellauswahl**: Welche Modelle verfügbar sind, hängt von der Admin-Konfiguration ab. Neben den Standard-Providern (OpenAI, Anthropic, Google, Mistral, xAI, Azure) kann auch **Mammouth.ai** als Aggregator mit Zugang zu GPT-5.x, Claude 4.x, Gemini 3.x und weiteren Modellen verfügbar sein.
+- **Sidebar**: Klick auf den Hauptbereich schließt die Sidebar — das ist gewollt. Zur NavRail navigieren, um sie wieder zu öffnen.
+- **Welcome-Screen**: Jederzeit über das XQT5-Logo erreichbar. Von dort kann sofort eine neue Frage eingegeben werden.
+- **Sessions**: Bei deaktivierten Benutzern werden Sessions sofort ungültig — neu einloggen.
+- **Seitenzahlen in Zitaten**: Nur bei Dokumenten verfügbar, die nach der letzten Plattform-Aktualisierung hochgeladen oder neu verarbeitet wurden.
+- **Fehlende Zusammenfassung oder Modell**: Admin kontaktieren.
