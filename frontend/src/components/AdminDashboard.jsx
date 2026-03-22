@@ -836,8 +836,13 @@ function ModelsTab() {
                 </label>
               </td>
               <td>
-                <input type="radio" name="default_model" checked={m.is_default}
-                  onChange={() => handleSetDefault(m.id)} />
+                {m.is_default ? (
+                  <span style={{ color: 'var(--orange)', fontWeight: 600, fontSize: 13 }}>✓ Default</span>
+                ) : (
+                  <button className="btn btn-secondary btn-small" onClick={() => handleSetDefault(m.id)}>
+                    Setzen
+                  </button>
+                )}
               </td>
               <td>
                 <button className="btn btn-danger btn-small" onClick={() => handleDelete(m.id)}>

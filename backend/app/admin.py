@@ -196,9 +196,9 @@ def update_model_config(config_id: str, **fields: Any) -> Optional[Dict[str, Any
     if not update_data:
         return None
 
-    # If setting a new default, unset all others first
+    # If setting a new default, unset all others first (unconditional — no boolean filter)
     if update_data.get("is_default") is True:
-        supabase.table("app_model_config").update({"is_default": False}).eq("is_default", True).execute()
+        supabase.table("app_model_config").update({"is_default": False}).neq("id", config_id).execute()
 
     result = supabase.table("app_model_config").update(update_data).eq("id", config_id).execute()
     if not result.data:
