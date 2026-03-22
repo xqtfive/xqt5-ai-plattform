@@ -53,6 +53,7 @@ PROVIDER_CONFIG = {
         "chat_path": "/chat/completions",
         "auth_header": "Authorization",
         "auth_prefix": "Bearer ",
+        "skip_temperature": True,
     },
 }
 
@@ -152,14 +153,17 @@ def _get_api_key(provider: str) -> str:
 
 
 def _build_openai_compatible_request(
-    messages: List[Dict[str, str]], model_name: str, temperature: float, stream: bool
+    messages: List[Dict[str, str]], model_name: str, temperature: float, stream: bool,
+    skip_temperature: bool = False,
 ) -> Dict[str, Any]:
-    return {
+    payload: Dict[str, Any] = {
         "model": model_name,
         "messages": messages,
-        "temperature": temperature,
         "stream": stream,
     }
+    if not skip_temperature:
+        payload["temperature"] = temperature
+    return payload
 
 
 def _build_anthropic_request(
@@ -239,7 +243,8 @@ async def _call_openai_compatible(
         config["auth_header"]: f"{config['auth_prefix']}{api_key}",
         "Content-Type": "application/json",
     }
-    payload = _build_openai_compatible_request(messages, model_name, temperature, stream=False)
+    payload = _build_openai_compatible_request(messages, model_name, temperature, stream=False,
+                                               skip_temperature=config.get("skip_temperature", False))
 
     resp = await client.post(url, headers=headers, json=payload)
     if resp.status_code != 200:
@@ -439,7 +444,8 @@ async def _stream_openai_compatible(
         config["auth_header"]: f"{config['auth_prefix']}{api_key}",
         "Content-Type": "application/json",
     }
-    payload = _build_openai_compatible_request(messages, model_name, temperature, stream=True)
+    payload = _build_openai_compatible_request(messages, model_name, temperature, stream=True,
+                                               skip_temperature=config.get("skip_temperature", False))
     payload["stream_options"] = {"include_usage": True}
 
     usage = {}
