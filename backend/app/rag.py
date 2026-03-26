@@ -1,5 +1,6 @@
 import logging
 import re
+from calendar import monthrange
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
@@ -258,12 +259,184 @@ SUMMARY_QUERY_KEYWORDS = {
     "zusammenfassen", "zusammenfassung", "fasse", "überblick", "ueberblick",
 }
 
+LISTING_QUERY_KEYWORDS = {
+    "welche dokumente", "welche dateien", "welche unterlagen",
+    "liste alle dokumente", "liste die dokumente", "zeige alle dokumente",
+    "which documents", "list documents", "list all documents", "show documents",
+    "what documents", "what files",
+    "dokumente kennst", "dokumente hast", "dokumente gibt es",
+    "dokumente vorhanden", "dokumente verfügbar",
+}
+
+# Max chunks returned by targeted (filter-based) retrieval — caps context size.
+# 80 chunks × ~512 tokens ≈ 40 k tokens, comfortably within large-context models.
+_MAX_TARGETED_CHUNKS = 80
+
+# German and English month names → month number
+_MONTH_MAP: Dict[str, int] = {
+    "januar": 1, "jänner": 1, "january": 1,
+    "februar": 2, "february": 2,
+    "märz": 3, "maerz": 3, "march": 3,
+    "april": 4,
+    "mai": 5, "may": 5,
+    "juni": 6, "june": 6,
+    "juli": 7, "july": 7,
+    "august": 8,
+    "september": 9,
+    "oktober": 10, "october": 10,
+    "november": 11,
+    "dezember": 12, "december": 12,
+}
+
+# Common document-type nouns used for filename ILIKE matching
+_DOC_TYPE_WORDS = [
+    "protokoll", "protokolle",
+    "rechnung", "rechnungen",
+    "vertrag", "verträge", "vertraege",
+    "bericht", "berichte",
+    "angebot", "angebote",
+    "gutachten",
+    "invoice", "invoices",
+    "contract", "contracts",
+    "report", "reports",
+    "minutes",
+]
+
+
+def parse_document_filters(query: str) -> Dict[str, Any]:
+    """Extract temporal and type filters from a natural-language query.
+
+    Returns a dict with zero or more of these keys:
+      date_from   — ISO date string "YYYY-MM-DD" (inclusive)
+      date_to     — ISO date string "YYYY-MM-DD" (inclusive, end of day)
+      name_pattern — substring for case-insensitive filename matching
+    """
+    q = (query or "").lower()
+    filters: Dict[str, Any] = {}
+
+    # Year: 4-digit, 2020–2099
+    year_m = re.search(r"\b(20[2-9]\d)\b", q)
+    year = int(year_m.group(1)) if year_m else None
+
+    # Month
+    month = None
+    for m_name, m_num in _MONTH_MAP.items():
+        if m_name in q:
+            month = m_num
+            break
+
+    if year and month:
+        last_day = monthrange(year, month)[1]
+        filters["date_from"] = f"{year}-{month:02d}-01"
+        filters["date_to"] = f"{year}-{month:02d}-{last_day}"
+    elif year:
+        filters["date_from"] = f"{year}-01-01"
+        filters["date_to"] = f"{year}-12-31"
+
+    # Document type → filename pattern (use the matched word verbatim for ILIKE)
+    for word in _DOC_TYPE_WORDS:
+        if word in q:
+            filters["name_pattern"] = word
+            break
+
+    return filters
+
+
+def fetch_filtered_document_ids(
+    user_id: str,
+    pool_id: Optional[str],
+    chat_id: Optional[str],
+    filters: Dict[str, Any],
+) -> List[str]:
+    """Query app_documents using date/name filters and return matching IDs (ready only).
+
+    Returns an empty list when no filters are supplied — callers fall back to
+    normal vector retrieval in that case.
+    """
+    if not filters:
+        return []
+
+    q = (
+        supabase.table("app_documents")
+        .select("id")
+        .eq("status", "ready")
+    )
+
+    if pool_id is not None:
+        q = q.eq("pool_id", pool_id)
+    elif chat_id is not None:
+        q = q.eq("user_id", user_id).eq("chat_id", chat_id).is_("pool_id", "null")
+    else:
+        q = q.eq("user_id", user_id).is_("pool_id", "null").is_("chat_id", "null")
+
+    if "date_from" in filters:
+        q = q.gte("created_at", filters["date_from"])
+    if "date_to" in filters:
+        q = q.lte("created_at", filters["date_to"] + "T23:59:59")
+    if "name_pattern" in filters:
+        q = q.ilike("filename", f"%{filters['name_pattern']}%")
+
+    result = q.execute()
+    ids = [row["id"] for row in (result.data or [])]
+    logger.info("Document filter %s → %d matching doc(s)", filters, len(ids))
+    return ids
+
+
+def fetch_chunks_for_documents(document_ids: List[str]) -> List[Dict[str, Any]]:
+    """Fetch up to _MAX_TARGETED_CHUNKS chunks from the given documents.
+
+    Results are ordered by (document_id, chunk_index) so the LLM reads each
+    document sequentially.  All chunks get similarity=1.0 — they're relevant
+    by construction (the caller already filtered by metadata).
+    """
+    if not document_ids:
+        return []
+
+    rows_result = (
+        supabase.table("app_document_chunks")
+        .select("id, document_id, chunk_index, content, token_count, page_number")
+        .in_("document_id", document_ids)
+        .order("document_id")
+        .order("chunk_index")
+        .limit(_MAX_TARGETED_CHUNKS)
+        .execute()
+    )
+    rows = rows_result.data or []
+    if not rows:
+        return []
+
+    # Batch-fetch filenames
+    unique_doc_ids = list({r["document_id"] for r in rows})
+    fn_result = (
+        supabase.table("app_documents")
+        .select("id, filename")
+        .in_("id", unique_doc_ids)
+        .execute()
+    )
+    filename_map = {d["id"]: d["filename"] for d in (fn_result.data or [])}
+
+    return [
+        {
+            "id": row["id"],
+            "document_id": row["document_id"],
+            "chunk_index": row["chunk_index"],
+            "content": row["content"],
+            "token_count": row.get("token_count", 0),
+            "page_number": row.get("page_number"),
+            "filename": filename_map.get(row["document_id"], "unknown"),
+            "similarity": 1.0,
+        }
+        for row in rows
+    ]
+
 
 def detect_query_intent(query: str) -> str:
-    """Return a coarse retrieval intent: summary or fact."""
+    """Return a coarse retrieval intent: summary, listing, or fact."""
     q = (query or "").lower()
     if any(keyword in q for keyword in SUMMARY_QUERY_KEYWORDS):
         return "summary"
+    if any(keyword in q for keyword in LISTING_QUERY_KEYWORDS):
+        return "listing"
     return "fact"
 
 
@@ -524,6 +697,7 @@ async def retrieve_chunks_with_strategy(
     pool_id: Optional[str] = None,
     intent: str = "fact",
     rerank_settings: Optional[Dict[str, Any]] = None,
+    document_filters: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """Adaptive retrieval with fallback passes for generic/summary prompts.
 
@@ -533,7 +707,28 @@ async def retrieve_chunks_with_strategy(
     Cohere reranker then selects the best subset.
 
     Pool/global scope uses threshold-filtered plans (may have many unrelated docs).
+
+    When document_filters are supplied and the intent is summary or listing,
+    targeted retrieval is attempted first: all chunks from matching documents are
+    fetched in document order, bypassing vector search.  Falls back to normal
+    retrieval when no documents match the filter.
     """
+    # Targeted retrieval for summary/listing intents with metadata filters
+    if document_filters and intent in ("summary", "listing"):
+        filtered_ids = fetch_filtered_document_ids(user_id, pool_id, chat_id, document_filters)
+        if filtered_ids:
+            chunks = fetch_chunks_for_documents(filtered_ids)
+            if chunks:
+                logger.info(
+                    "Targeted retrieval: %d chunks from %d doc(s) (filters=%s)",
+                    len(chunks), len(filtered_ids), document_filters,
+                )
+                return chunks
+            logger.warning(
+                "Targeted retrieval: %d doc(s) matched but yielded no chunks — falling back",
+                len(filtered_ids),
+            )
+
     plans: List[Tuple[int, float]]
 
     if chat_id is not None:

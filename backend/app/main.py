@@ -584,9 +584,10 @@ async def send_message(
 
     # Detect intent first (never fails); initialize chunks before vector search
     query_intent = rag_mod.detect_query_intent(payload.content)
+    doc_filters = rag_mod.parse_document_filters(payload.content)
     chunks = []
 
-    # Step 1: Vector search — best-effort, failures must not block text fallback
+    # Step 1: Vector/targeted search — best-effort, failures must not block text fallback
     try:
         rag_settings = admin_crud.get_rag_settings()
         chunks = await rag_mod.retrieve_chunks_with_strategy(
@@ -595,6 +596,7 @@ async def send_message(
             chat_id=conversation_id,
             intent=query_intent,
             rerank_settings=rag_settings,
+            document_filters=doc_filters,
         )
     except Exception as e:
         logger.warning("RAG vector search failed: %s", e, exc_info=True)
@@ -616,6 +618,16 @@ async def send_message(
             _inject_system_context(llm_messages, rag_context)
             has_doc_context = True
         else:
+            docs = documents_mod.list_documents(
+                user_id=current_user["id"],
+                chat_id=conversation_id,
+                scope="chat",
+            )
+            docs_context = _build_available_documents_context(docs)
+            _inject_system_context(llm_messages, docs_context)
+
+        # For listing intents, always inject the full document list (even when chunks found)
+        if query_intent == "listing":
             docs = documents_mod.list_documents(
                 user_id=current_user["id"],
                 chat_id=conversation_id,
@@ -1941,9 +1953,10 @@ async def send_pool_message(
 
     # Detect intent first (never fails); initialize chunks before vector search
     query_intent = rag_mod.detect_query_intent(payload.content)
+    doc_filters = rag_mod.parse_document_filters(payload.content)
     chunks = []
 
-    # Step 1: Vector search — best-effort, failures must not block text fallback
+    # Step 1: Vector/targeted search — best-effort, failures must not block text fallback
     try:
         rag_settings = admin_crud.get_rag_settings()
         chunks = await rag_mod.retrieve_chunks_with_strategy(
@@ -1952,6 +1965,7 @@ async def send_pool_message(
             pool_id=pool_id,
             intent=query_intent,
             rerank_settings=rag_settings,
+            document_filters=doc_filters,
         )
     except Exception as e:
         logger.warning("Pool RAG vector search failed: %s", e, exc_info=True)
@@ -1973,6 +1987,12 @@ async def send_pool_message(
             _inject_system_context(llm_messages, rag_context)
             has_doc_context = True
         else:
+            pool_docs = pools_mod.list_pool_documents(pool_id)
+            docs_context = _build_available_documents_context(pool_docs)
+            _inject_system_context(llm_messages, docs_context)
+
+        # For listing intents, always inject the full document list (even when chunks found)
+        if query_intent == "listing":
             pool_docs = pools_mod.list_pool_documents(pool_id)
             docs_context = _build_available_documents_context(pool_docs)
             _inject_system_context(llm_messages, docs_context)
