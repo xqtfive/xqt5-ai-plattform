@@ -511,25 +511,34 @@ async def _summarize_document(extracted_text: str, filename: str) -> Optional[st
         return None
 
 
+_AUTO_NAME_PROMPT = (
+    "Generate a very short title (max 6 words) for a conversation that starts with this message. "
+    "Reply with ONLY the title, no quotes, no punctuation at the end.\n\nMessage: "
+)
+
+
 async def _auto_name_conversation(conversation_id: str, user_message: str) -> None:
     """Generate a short title for the conversation using the LLM."""
     try:
-        messages = [
-            {
-                "role": "user",
-                "content": (
-                    f"Generate a very short title (max 6 words) for a conversation that starts with this message. "
-                    f"Reply with ONLY the title, no quotes, no punctuation at the end.\n\n"
-                    f"Message: {user_message[:500]}"
-                ),
-            }
-        ]
+        messages = [{"role": "user", "content": _AUTO_NAME_PROMPT + user_message[:500]}]
         result = await call_llm(messages, DEFAULT_MODEL, temperature=0.3)
         title = result["content"].strip().strip('"').strip("'")[:100]
         if title:
             storage.update_conversation(conversation_id, title=title)
     except Exception as e:
         logger.warning(f"Auto-naming failed for {conversation_id}: {e}")
+
+
+async def _auto_name_pool_chat(chat_id: str, user_message: str) -> None:
+    """Generate a short title for the pool chat using the LLM."""
+    try:
+        messages = [{"role": "user", "content": _AUTO_NAME_PROMPT + user_message[:500]}]
+        result = await call_llm(messages, DEFAULT_MODEL, temperature=0.3)
+        title = result["content"].strip().strip('"').strip("'")[:100]
+        if title:
+            pools_mod.update_pool_chat_title(chat_id, title)
+    except Exception as e:
+        logger.warning(f"Pool chat auto-naming failed for {chat_id}: {e}")
 
 
 @app.post("/api/conversations/{conversation_id}/message", response_model=None)
@@ -1936,6 +1945,9 @@ async def send_pool_message(
         chat.get("temperature") if chat.get("temperature") is not None else DEFAULT_TEMPERATURE
     )
 
+    # Check if this is the first user message (for auto-naming)
+    is_first_message = not any(m["role"] == "user" for m in chat.get("messages", []))
+
     # Store user message
     pools_mod.add_pool_chat_message(chat_id, "user", payload.content, user_id=current_user["id"])
 
@@ -2052,6 +2064,7 @@ async def send_pool_message(
             _stream_pool_response(
                 pool_id, chat_id, llm_messages, model, temperature,
                 current_user["id"], rag_sources=rag_sources, rag_image_sources=rag_image_sources,
+                is_first_message=is_first_message, user_content=payload.content,
             ),
             media_type="text/event-stream",
             headers={
@@ -2069,6 +2082,9 @@ async def send_pool_message(
         raise HTTPException(status_code=502, detail=str(e))
 
     pools_mod.add_pool_chat_message(chat_id, "assistant", assistant_content, model=model)
+
+    if is_first_message:
+        asyncio.create_task(_auto_name_pool_chat(chat_id, payload.content))
 
     usage = result.get("usage", {})
     if usage:
@@ -2101,6 +2117,8 @@ async def _stream_pool_response(
     user_id: str,
     rag_sources: Optional[List[Dict]] = None,
     rag_image_sources: Optional[List[Dict]] = None,
+    is_first_message: bool = False,
+    user_content: str = "",
 ):
     full_content = ""
     usage = {}
@@ -2131,6 +2149,9 @@ async def _stream_pool_response(
         if rag_image_sources:
             done_data['image_sources'] = rag_image_sources
         yield f"data: {json.dumps(done_data)}\n\n"
+
+        if is_first_message and user_content:
+            asyncio.create_task(_auto_name_pool_chat(chat_id, user_content))
 
     except LLMError as e:
         yield f"data: {json.dumps({'error': str(e)})}\n\n"

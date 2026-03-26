@@ -391,6 +391,10 @@ def has_ready_pool_documents(pool_id: str) -> bool:
 # ── Pool Chats ──
 
 
+def update_pool_chat_title(chat_id: str, title: str) -> None:
+    supabase.table("pool_chats").update({"title": title}).eq("id", chat_id).execute()
+
+
 def create_pool_chat(
     pool_id: str,
     created_by: str,
