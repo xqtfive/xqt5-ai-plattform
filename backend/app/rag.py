@@ -747,8 +747,8 @@ async def retrieve_chunks_with_strategy(
     fetched in document order, bypassing vector search.  Falls back to normal
     retrieval when no documents match the filter.
     """
-    # Targeted retrieval for summary/listing intents with metadata filters
-    if document_filters and intent in ("summary", "listing"):
+    # Targeted retrieval for all intents with metadata filters
+    if document_filters and intent in ("summary", "listing", "fact"):
         filtered_ids = fetch_filtered_document_ids(user_id, pool_id, chat_id, document_filters)
         if filtered_ids:
             chunks = fetch_chunks_for_documents(filtered_ids)
