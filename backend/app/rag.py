@@ -310,20 +310,54 @@ def parse_document_filters(query: str) -> Dict[str, Any]:
       date_from   — ISO date string "YYYY-MM-DD" (inclusive)
       date_to     — ISO date string "YYYY-MM-DD" (inclusive, end of day)
       name_pattern — substring for case-insensitive filename matching
+
+    Handles numeric date formats (DD.MM.YYYY, D.M.YYYY, YYYY-MM-DD, MM/YYYY)
+    as well as text month names (März, march, …).
     """
     q = (query or "").lower()
     filters: Dict[str, Any] = {}
 
-    # Year: 4-digit, 2020–2099
-    year_m = re.search(r"\b(20[2-9]\d)\b", q)
-    year = int(year_m.group(1)) if year_m else None
+    year: Optional[int] = None
+    month: Optional[int] = None
 
-    # Month
-    month = None
-    for m_name, m_num in _MONTH_MAP.items():
-        if m_name in q:
-            month = m_num
-            break
+    # 1. Numeric date formats — highest priority, checked first
+    # DD.MM.YYYY or D.M.YYYY  (e.g. "23.03.2026", "1.3.2026")
+    m = re.search(r"\b(\d{1,2})\.(\d{1,2})\.(20[2-9]\d)\b", q)
+    if m:
+        month = int(m.group(2))
+        year = int(m.group(3))
+
+    # YYYY-MM-DD (e.g. "2026-03-23")
+    if not (year and month):
+        m = re.search(r"\b(20[2-9]\d)-(\d{2})-\d{2}\b", q)
+        if m:
+            year = int(m.group(1))
+            month = int(m.group(2))
+
+    # MM/YYYY or MM.YYYY (e.g. "03/2026", "03.2026")
+    if not (year and month):
+        m = re.search(r"\b(0?[1-9]|1[0-2])[./](20[2-9]\d)\b", q)
+        if m:
+            month = int(m.group(1))
+            year = int(m.group(2))
+
+    # 2. Text month names (e.g. "März 2026", "march 2026")
+    if not (year and month):
+        year_m = re.search(r"\b(20[2-9]\d)\b", q)
+        year = int(year_m.group(1)) if year_m else None
+        for m_name, m_num in _MONTH_MAP.items():
+            if m_name in q:
+                month = m_num
+                break
+
+    # 3. Year-only fallback (no month found)
+    if not year:
+        year_m = re.search(r"\b(20[2-9]\d)\b", q)
+        year = int(year_m.group(1)) if year_m else None
+
+    # Validate month range
+    if month and not (1 <= month <= 12):
+        month = None
 
     if year and month:
         last_day = monthrange(year, month)[1]
