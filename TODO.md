@@ -247,11 +247,12 @@ Sourced from `kvml_test/` — the tender is not the goal, but the feature requir
   - Complies with DSGVO Art. 20 (data portability) and audit requirements
   - File: new `/api/export/me` endpoint in `main.py`
 
-- [ ] 🟡 **Configurable data routing rules** (data type → model)
+- [ ] 🟡 **Configurable data routing rules** (data type → model, BYOM / on-prem routing)
   - Admin can define rules: e.g. "if document type = contract → only allow local/on-prem models"
   - Rules stored in `app_routing_rules` table: `condition` (document_type, pool_id, group_id) + `allowed_model_ids[]`
   - Enforced in `llm.py` before LLM call; returns 403 with message if rule violated
-  - Use case: sensitive data pools restricted to EU/local models only
+  - **BYOM use case:** organisations running self-hosted inference (Llama, Qwen via Ollama or vLLM) can route sensitive pools exclusively to local endpoints — custom base URL + API-key are already supported in `providers.py`; this rule layer makes the routing automatic and enforceable rather than manual
+  - Use case: sensitive/social data pools restricted to EU/local models only; general chat allowed cloud models
 
 - [ ] 🟡 **Conditional Access / IP allowlist middleware**
   - Admin-configurable IP ranges that are allowed to access the platform
@@ -271,6 +272,27 @@ Sourced from `kvml_test/` — the tender is not the goal, but the feature requir
   - Expose `/metrics` endpoint (admin-auth protected)
   - Key metrics: request latency p50/p95, LLM call duration, RAG retrieval time, error rates, active users
   - Optional: Grafana dashboard config as code in `infra/`
+
+- [ ] 🟢 **WCAG 2.1 accessibility**
+  - Systematic accessibility pass across all UI components
+  - Key requirements: keyboard navigation for all interactive elements, ARIA labels on icon-only buttons, sufficient colour contrast ratios (4.5:1 for text), focus indicators visible, screen-reader-friendly semantics (`role`, `aria-live` for streaming output)
+  - Run automated checks: `axe-core` or `eslint-plugin-jsx-a11y`
+  - High effort (7+ days for full compliance), but correct long-term direction for any enterprise product
+  - File: all `.jsx` components; start with `MessageBubble.jsx`, `Sidebar.jsx`, `MessageInput.jsx`
+
+- [ ] 🟢 **Self-hosted / pluggable vector database support**
+  - Currently the RAG layer is hard-coupled to Supabase pgvector RPCs
+  - Abstract retrieval behind a `VectorStore` interface with a pgvector implementation as default; allow alternative backends (Qdrant, ChromaDB) for customers who need on-prem RAG
+  - Minimum: make the vector DB connection string and RPC names configurable via env vars so a self-hosted pgvector instance works without code changes
+  - Full abstraction (Qdrant/ChromaDB support) is large effort — only if there is concrete customer demand for on-prem RAG
+  - File: `rag.py` (extract retrieval calls into a thin adapter class)
+
+- [ ] 🟢 **BYOK — Bring-your-own-Key encryption support**
+  - Currently encryption keys (Fernet for stored API keys) are managed internally; hosting-provider disk encryption protects data at rest
+  - BYOK allows customers to supply their own encryption key, held outside the hosting provider — the platform wraps all at-rest secrets with the customer key before storing
+  - Implementation: KMS integration (AWS KMS, Azure Key Vault, or HashiCorp Vault) as the key provider; envelope encryption pattern (data key encrypted with customer master key)
+  - High effort and adds operational complexity; only relevant for organisations with strict key custody requirements
+  - File: `encryption.py`
 
 ---
 
@@ -312,11 +334,11 @@ Sourced from `kvml_test/` — the tender is not the goal, but the feature requir
   - Per-conversation toggle (user) + default setting (admin)
   - Append search results to system prompt as context; show sources in citations
 
-- [ ] 🟠 **Append-only audit log** — ~1 day
-  - New table `app_audit_log`: `id`, `timestamp`, `user_id`, `action`, `model`, `token_count`, `pool_id`
-  - RLS: INSERT only for backend service role, SELECT for admin only
-  - Log: all LLM calls, file uploads, user logins, admin actions
-  - Admin UI table view with date/user filters
+- [ ] 🟠 **Audit log — extend to append-only** — ~0.5 days
+  - `app_audit_logs` table, `audit.py` module, and admin UI table view already exist; LLM calls, logins, and admin actions are already logged
+  - **Missing:** RLS append-only enforcement — add a new migration with `CREATE POLICY` blocking DELETE/UPDATE on `app_audit_logs`; no such policy exists today
+  - **Missing:** File uploads not logged — add `audit.log_event()` calls in the upload handlers in `main.py` and `documents.py`
+  - **Missing:** Token counts absent from LLM audit entries — extend `metadata` payload at `main.py:763` to include `prompt_tokens` and `completion_tokens`
 
 - [ ] 🟠 **Token budgets and EUR cost limits** — ~2–3 days
   - Track token usage per user per period in `app_usage` table
@@ -367,14 +389,20 @@ The `basline-code/rag-vrm/` directory contains a C++ codebase RAG system with a 
 
 | Technique | Latest | DRI | Action |
 |-----------|--------|-----|--------|
-| Weighted RRF (3 signals) | ❌ equal weights | ❌ equal weights | **Adopt** |
-| Payload/metadata search (3rd retrieval signal) | ❌ | ❌ | **Adopt** |
-| Custom reranking with explicit boost signals | ❌ | ❌ | **Adapt** |
-| BM25 corpus caching (Redis, hash-keyed) | ❌ | ❌ | **Adopt** |
-| Token-aware embedding batch splitting | ✅ | ✅ | Skip |
+| Weighted RRF (3 signals) | ❌ equal weights | ❌ equal weights | **Adopt** — 4.1 |
+| Payload/metadata search (3rd retrieval signal) | ❌ | ❌ | **Adopt** — 4.2 |
+| Custom reranking with explicit boost signals | ❌ | ❌ | **Adapt** — 4.3 |
+| BM25 corpus caching (Redis, hash-keyed) | ❌ | ❌ | **Adapt** — 4.4 |
+| Per-chunk symbol/keyword extraction | ❌ | ❌ | **Adopt** — 4.5 / 4.6 |
+| File-type dispatch → type-specific parser + chunker | ❌ | ❌ | **Adopt** — 4.6 |
+| Content-type heuristic detection (beyond extension) | ❌ | ❌ | **New** — 4.6 |
+| Code symbol extraction (AST/regex) per chunk | ❌ | ❌ | **Adapt** — 4.6 |
+| start_line / end_line per chunk | ❌ | ❌ | **Adopt** — 4.6 |
+| Code symbol payload search + filename boost | ❌ | ❌ | **Adapt** — 4.7 |
+| Token-aware embedding batch splitting | ✅ | ✅ | Skip — already present |
 | Query intent detection | partial | ✅ 3-way | Already in DRI |
 | Tiered fallback retrieval | partial | ✅ multi-tier | Already in DRI |
-| Table-aware chunking | ❌ | ✅ | Already in DRI |
+| Table-aware chunking | ❌ | ✅ | Already in DRI — port via Part 1 |
 | Heading breadcrumb injection | ✅ | ✅ | Already present |
 
 ---
@@ -434,7 +462,8 @@ rrf_score = vector_w/(k+rank_v) + bm25_w/(k+rank_b) + payload_w/(k+rank_p)
   - `-0.1` if chunk is very short (<80 chars) and not a table or heading chunk
   - Final score: `max(0, min(rrf_score + boost, 1.0))`
   - File: new `_rerank_chunks(chunks, query, intent)` function in `rag.py`
-  - **Note:** Pure in-process computation, zero latency overhead vs. Cohere
+  - **Note:** The latest already has optional Cohere cross-encoder reranking (`_apply_optional_rerank()`). This local reranker is a zero-latency, zero-cost complement — no API key required, runs in-process. They serve different purposes: Cohere does deep semantic re-scoring, this does fast metadata-aware boosting. Both can coexist: local reranker first, then optional Cohere pass on the top-N.
+  - **Also:** Recency and authority boost signals (Part 5.7) should be implemented as additional cases inside this reranker — not separately.
 
 ---
 
@@ -466,6 +495,89 @@ rrf_score = vector_w/(k+rank_v) + bm25_w/(k+rank_b) + payload_w/(k+rank_p)
   - German stopword list needed (NLTK has one, or use `spacy` de_core_news_sm)
   - **Schema:** `ALTER TABLE app_document_chunks ADD COLUMN keywords text[] DEFAULT '{}';`
   - Also create GIN index: `CREATE INDEX ON app_document_chunks USING GIN (keywords);`
+
+---
+
+### 4.6 Content-Type Detection + Adaptive Upload Strategy
+
+**What baseline does:** The indexer routes each file to a completely different parser and chunker based on file extension: C++ files → syntax-aware LangChain CPP splitter with entity extraction; config files (.json/.yaml/.xml) → config parser; scripts (.py/.sh) → script parser with function count; docs (.md/.txt) → generic prose chunker. Each route produces different chunk metadata tailored to the content type.
+
+**What xqt5 does:** All uploaded files go through the same pipeline regardless of content — PDFs via Mistral OCR, text files via direct read, then the same heading/sentence-boundary chunker for everything. A `.py` file and a policy document receive identical treatment.
+
+This is the single most structurally underexploited idea from the baseline. The concept generalises beyond C++ to any upload.
+
+- [ ] 🟠 **Detect content type at upload time** — `detect_content_type(filename, file_bytes) -> str`
+  - **Extension-based first pass** (fast, ~90% accurate):
+    - `.py` → `code_python`
+    - `.js`, `.ts`, `.jsx`, `.tsx` → `code_javascript`
+    - `.sql` → `code_sql`
+    - `.c`, `.cpp`, `.java`, `.go`, `.rs`, `.cs` → `code_generic`
+    - `.json` → `config_json`
+    - `.yaml`, `.yml` → `config_yaml`
+    - `.xml` → `config_xml`
+    - `.md` → `markdown`
+    - `.csv` → `data_csv` (already planned in Part 3.0)
+    - `.xlsx`, `.xls` → `data_excel` (already planned in Part 3.0)
+    - `.pdf`, `.docx`, `.png`, `.jpg` → `structured_doc` (current OCR pipeline)
+    - `.txt` and unknown → proceed to content heuristic
+  - **Content heuristic for ambiguous files** (for `.txt`, no extension, or overrides):
+    - First 500 bytes start with `{` or `[` → `config_json`
+    - First line is `---` or has dominant `key: value` pattern → `config_yaml`
+    - Has `def `, `import `, `class ` + Python-style indentation → `code_python`
+    - Has `` ``` `` fenced code blocks → `mixed_prose_code`
+    - Has `|` table rows (> 3 lines matching `^\s*\|`) → `markdown`
+    - Has `function `, `const `, `let `, `=>` → `code_javascript`
+    - Otherwise → `prose`
+  - Store detected type as `content_type varchar` in `app_documents`
+  - **Schema:** `ALTER TABLE app_documents ADD COLUMN content_type varchar DEFAULT 'prose';`
+  - File: `documents.py` → new `detect_content_type()` function; called at upload before OCR/chunking
+
+- [ ] 🟠 **Route to type-specific chunking strategy** — based on `content_type`:
+  - **`prose` / `structured_doc`:** current pipeline (heading-boundary + sentence splitter) — no change
+  - **`markdown`:** heading-boundary chunking (already good) + treat fenced code blocks as atomic units (same mechanism as table-aware chunking but for `` ``` `` delimiters)
+  - **`code_python` / `code_javascript` / `code_generic` / `code_sql`:** use `RecursiveCharacterTextSplitter.from_language()` from LangChain with the appropriate `Language` enum — this splits at function/class/method boundaries, not sentence boundaries; preserves semantic units in code
+    - LangChain `Language.PYTHON`, `Language.JS`, `Language.SQL`, `Language.CPP` etc.
+    - No OCR step — read file as UTF-8 text directly
+    - Overlap between chunks: 1–2 function signatures (so a caller chunk always sees the signature it references)
+  - **`config_json` / `config_yaml` / `config_xml`:** store as a single atomic chunk if ≤ 2000 tokens; for larger configs, split at top-level keys only — never mid-key
+  - **`data_csv`:** row-level chunking with column headers repeated in each chunk (same principle as table continuation, already planned in Part 3.0)
+  - File: `documents.py` → `_chunk_by_content_type()` dispatcher
+
+- [ ] 🟠 **Extract code symbols per chunk** — for `content_type` in `{code_python, code_javascript, code_sql, code_generic}`:
+  - **Python:** use `ast.parse()` to extract function names, class names, imported module names from each chunk — far more accurate than TF-IDF keywords for code
+  - **JS/TS:** regex for `function\s+(\w+)`, `class\s+(\w+)`, `const\s+(\w+)\s*=\s*(async\s*)?(function|\()` 
+  - **SQL:** regex for table names from `FROM`, `JOIN`, `INTO`, `UPDATE`, `CREATE TABLE`; operation type (`SELECT`/`INSERT`/`UPDATE`/`DELETE`/`CREATE`)
+  - **Generic code:** function call extraction (same pattern as baseline's `extract_called_functions`)
+  - Store as `symbols text[]` in `app_document_chunks` — separate from `keywords[]` (TF-IDF for prose)
+  - **Schema:** `ALTER TABLE app_document_chunks ADD COLUMN symbols text[] DEFAULT '{}';`  
+    `CREATE INDEX ON app_document_chunks USING GIN (symbols);`
+  - File: `documents.py` → `_extract_code_symbols(content, content_type) -> List[str]`
+
+- [ ] 🟠 **Store `start_line` / `end_line` per chunk** — for all content types:
+  - The baseline tracks exact line ranges for every chunk. xqt5 currently tracks `page_number` for PDF chunks but nothing for text/code files
+  - Adding `start_line int` and `end_line int` to `app_document_chunks` enables: precise citations ("line 42–67 of auth.py"), jump-to-source links in frontend, debugging of chunking quality
+  - For PDFs: derive from the `<!-- page:N -->` markers already tracked
+  - For text/code: track directly during chunking
+  - **Schema:** `ALTER TABLE app_document_chunks ADD COLUMN start_line int, ADD COLUMN end_line int;`
+
+---
+
+### 4.7 Code Symbol Payload Search (extends 4.2 + 4.6)
+
+**What baseline does:** Payload search on `entity_name`, `all_functions`, `all_classes` gives a strong exact-match signal when a query mentions a specific function or class name. This is the payload search's most powerful use case.
+
+**What xqt5 gains from 4.6:** Once `symbols[]` exists per chunk (from 4.6 above), code files unlock the same capability.
+
+- [ ] 🟡 **Extend payload search RPC to include `symbols[]`** — when `content_type` is a code type:
+  - Add `symbols` to the `payload_search_chunks` RPC's search targets (alongside `keywords[]`)
+  - Boost weight in RRF: code symbol exact match → same weight as `keywords` payload signal (0.15)
+  - In reranker (4.3): add `+0.5` if any `symbols[]` entry appears verbatim in the query (highest boost — code symbol exact match is a very strong signal, equivalent to baseline's entity_name boost)
+  - File: Supabase RPC update + `rag.py` → `_payload_search_chunks()`
+
+- [ ] 🟡 **File name as retrieval signal for code files** — the baseline boosts chunks from files whose name matches query terms (e.g., query "authentication" hits `auth.py` with `+0.4`):
+  - In reranker (4.3): add `+0.35` if `app_documents.filename` (without extension, lowercased) is a substring of the query or vice versa
+  - This is code-type agnostic — works for any file type but is most useful for code
+  - No schema change needed — `filename` already stored in `app_documents`
 
 ---
 
@@ -808,7 +920,7 @@ Sourced from web research on RAG best practices 2025/2026, Open WebUI feature se
 - [ ] 🟡 **Streaming error recovery** — Partial content + error marker when SSE stream breaks mid-response
 - [ ] 🟡 **Request deduplication** — Idempotency key on `POST /chat` to prevent double-submission
 - [ ] 🟡 **Background job queue for document processing** — Move PDF parsing + embedding to Celery/ARQ; return job ID immediately with polling endpoint
-- [ ] 🟡 **Health check endpoint** — `/health` returning DB, Redis, vector DB status
+- [ ] 🟡 **Health check endpoint — add dependency checks** — `/api/health` exists at `main.py:169` but is a stub (`{"status": "healthy"}`); extend it to actually probe DB, Redis, and pgvector connectivity and return per-dependency status
 - [ ] 🟡 **Frontend: citation link rendering** — Render `section_path` as breadcrumb in source tooltip (Phase 1.2 adds the data, this surfaces it in UI)
 - [ ] 🟡 **Frontend: upload progress indicator** — Show processing stages (uploading → OCR → chunking → embedding)
 - [ ] 🟢 **Semantic caching** — Skip LLM call if cosine similarity of recent query > 0.97
@@ -836,15 +948,19 @@ Sourced from web research on RAG best practices 2025/2026, Open WebUI feature se
 8. Phase 6.2 — Query expansion
 9. Weighted RRF fusion (Part 4.1)
 10. Prev/next chunk preview baked into chunks at indexing (Part 5.6)
-11. Recency + authority scoring signals (Part 5.7)
-12. Dynamic vision prompt per image type (Part 5.3)
+11. Dynamic vision prompt per image type (Part 5.3)
 
 **Post-tender: RAG quality depth (small schema migrations)**
-13. Phase 4.1 — Metadata extraction (language, doc_type, page_count)
-14. Per-chunk keyword extraction + GIN index (Part 4.5)
-15. `is_authoritative` flag on documents (Part 5.7)
-16. Payload search as third RRF signal (Part 4.2 — depends on 4.5)
-17. Local reranker with boost signals (Part 4.3)
+12. Phase 4.1 — Metadata extraction (language, doc_type, page_count)
+13. Content-type detection + `content_type` column (Part 4.6) — small migration, unlocks everything below
+14. Type-specific chunking dispatch for code/config/markdown (Part 4.6) — code-only, no further schema
+15. Code symbol extraction per chunk + `symbols[]` column + `start_line`/`end_line` (Part 4.6) — depends on 13
+16. Per-chunk keyword extraction + GIN index for prose (Part 4.5) — parallel with 15
+17. Payload search as third RRF signal (Part 4.2 — depends on 15 + 16)
+18. Local reranker with boost signals (Part 4.3)
+19. Code symbol payload search + filename boost in reranker (Part 4.7 — depends on 15 + 18)
+20. Recency + authority scoring signals (Part 5.7) — implement inside reranker (step 18)
+21. `is_authoritative` flag on documents (schema part of Part 5.7 — needed for step 20)
 
 **Post-tender: larger RAG work**
 18. Phase 6.1 — Summary embeddings
