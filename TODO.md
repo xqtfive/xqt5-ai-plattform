@@ -29,7 +29,7 @@ The merge direction is always **dri → latest**. The dri branch diverged at som
 
 These features exist in `xqt5-ai-plattform-dri` but are absent from the current latest (`xqt5-ai-plattform`). They must be ported as individual targeted changes. **Do not copy files wholesale** — the latest has its own changes that would be lost.
 
-> **Merge risk note:** The dri branch also made UI architecture changes (sidebar redesign, PoolDetail refactor, NavRail removal, Welcome.jsx simplification). Some of these may be regressions or incomplete work. The RAG backend changes are safe to port; the UI changes need case-by-case evaluation before porting.
+> **Scope note:** Only the RAG backend improvements from dri are being ported. The dri branch also made various UI and structural changes (sidebar redesign, NavRail removal, provider removals, Welcome.jsx simplification) — these are either regressions or have no value for the latest repo and are intentionally excluded.
 
 > **Critical bugfix:** The dri branch fixed `_reciprocal_rank_fusion()` overwriting the cosine `similarity` score with the tiny RRF score (0.008–0.016), which caused the relevance gate to always evaluate `False` and silently disabled RAG in hybrid mode. This fix must be ported first, before any other RAG changes.
 
@@ -54,6 +54,7 @@ These features exist in `xqt5-ai-plattform-dri` but are absent from the current 
   - Files: `rag.py`, `admin.py`, `models.py`, `AdminDashboard.jsx`
 
 - [ ] ✅🟠 **Phase 4.3 — Document summary on upload**
+  - **Verify first:** `_summarize_document()` appears to already exist in `main.py` of the latest repo — confirm it is wired up in both upload endpoints and actually populates `app_documents.summary` before treating this as done
   - `_summarize_document()` generates 2–3 sentence summary after chunking
   - Stored in `app_documents.summary` (column already exists, previously never populated)
   - Files: `main.py`, `documents.py`
@@ -92,71 +93,13 @@ These features exist in `xqt5-ai-plattform-dri` but are absent from the current 
 
 ### Additional Backend Changes in dri — Port to latest
 
-- [ ] 🟠 **`main.py`: Update `_inject_document_policy()`**
-  - Old (1 line): `"Base your answer strictly on provided context..."`
-  - New (3-part policy):
+- [ ] 🟠 **`main.py`: Update `_apply_document_access_policy()`**
+  - Current (2-part): don't claim no access + base answer on context
+  - New (3-part, from dri):
     1. Use document context ONLY when directly relevant to the user's question
     2. If user asks something unrelated to documents, answer from own knowledge — do not reference documents
     3. Base answers on provided context, state clearly when information is missing
-  - File: `main.py` → `_inject_document_policy()`
-
-- [ ] 🟠 **`llm.py`: Remove mammouth provider**
-  - Remove `"mammouth"` entry from `PROVIDER_CONFIGS` dict
-  - Remove all `mammouth/*` models from `AVAILABLE_MODELS` list (~20 models)
-  - Remove `skip_temperature` parameter from `_build_openai_compatible_request()`, `call_llm_openai_compatible()`, `stream_llm_openai_compatible()` — temperature is now always included
-  - File: `llm.py`
-  - **Note:** Verify no active users rely on mammouth models in `app_model_config` before removing
-
-- [ ] 🟡 **`providers.py`: Remove mammouth**
-  - Remove `"mammouth"` from `KNOWN_PROVIDERS` list
-  - Remove `"mammouth": "Mammouth.ai"` from `PROVIDER_DISPLAY` dict
-  - File: `providers.py`
-
-- [ ] 🟡 **`documents.py`: Remove PDF batching**
-  - dri had complex batching: split PDFs into 20-page chunks, loop with page offset management, token tracking per batch
-  - latest simplified to a single Mistral OCR call for the full PDF
-  - Remove: `_split_pdf_into_batches()` function, batch loop, page offset logic, per-batch token recording
-  - Remove import: `from .token_tracking import record_usage`
-  - File: `documents.py`
-  - **Note:** Verify Mistral can handle the full PDF size without batching before removing
-
-- [ ] 🟡 **`pools.py`: Remove `update_pool_chat_title()`**
-  - Function was used by the removed auto-naming feature
-  - Safe to remove once `_auto_name_pool_chat()` is removed from `main.py`
-  - File: `pools.py`
-
-### UI Changes in dri — Evaluate Before Porting
-
-- [ ] 🟡 **Split-panel sidebar** — DRI replaces tabbed sidebar with draggable split panel (`splitPct` state + mouse drag). Evaluate if UX is preferred before merging.
-- [ ] 🟡 **PoolDetail refactor** — Computes `canEdit`/`canAdmin`/`isOwner` from `pool.role` locally. Moves delete/leave handlers from `App.jsx` into `PoolDetail.jsx`. Low risk, merge recommended.
-- [ ] 🟡 **Remove auto pool-chat naming** — `_auto_name_pool_chat()` removed in dri. Also remove: `is_first_message` flag and `asyncio.create_task(...)` auto-naming call in pool message handler.
-- [ ] 🟡 **`MessageBubble.jsx`: Flat layout restructure**
-  - Old: nested `message-body > message-bubble > message-content` with `message-meta` at bottom
-  - New: flat `message-header` (shows YOU/ASSISTANT + model tag at top) → `message-content` → `SourceDisplay`
-  - Model tag moved from bottom meta to top header
-  - Replaced `isUser` variable with inline `role === 'assistant'` check
-  - File: `MessageBubble.jsx`
-- [ ] 🟡 **`PoolChatArea.jsx`: Move model/image selectors to header**
-  - Old: model select + image mode select were in the bottom input bar (`input-card-bar`)
-  - New: both selectors moved to `pool-chat-header` at the top
-  - Also removes textarea auto-resize logic (`autoResize()`, `textareaRef`, `handleChange()`)
-  - File: `PoolChatArea.jsx`
-- [ ] 🟡 **`MessageInput.jsx`: Remove textarea auto-resize**
-  - Removes: `useRef`, `autoResize()` function, `handleChange()`, textarea height reset on submit
-  - File: `MessageInput.jsx`
-  - **Note:** Auto-resize is a UX improvement — evaluate whether removing it is intentional
-- [ ] 🟡 **`LoginScreen.jsx`: Simplified markup + English labels**
-  - Old: styled logo with nested spans, labeled inputs with `<label>/<span>` structure, German labels ("Anmelden", "Benutzername")
-  - New: `<h1>` logo, inputs with placeholders, English labels ("Login", "Username")
-  - File: `LoginScreen.jsx`
-  - **Note:** German UI is the platform's language — verify whether switching to English was intentional
-- [ ] 🟡 **`UsageWidget.jsx`: Remove compact mode**
-  - Removes `compact` prop and the compact rendering branch (showed condensed `tokens · cost` inline)
-  - Now always renders full widget
-  - File: `UsageWidget.jsx`
-  - **Note:** Check if compact mode is used anywhere in the layout before removing
-- [ ] ⚠️ **NavRail removal** — dri removed the NavRail component entirely. Likely a regression — verify before merging. Main repo's NavRail should be kept.
-- [ ] ⚠️ **Welcome.jsx simplified to static** — dri removed the interactive message input (textarea, send button, auto-resize, `onSend` prop). Replaced with two static lines. Likely incomplete — verify intent before porting.
+  - File: `main.py` → `_apply_document_access_policy()`
 
 ---
 
