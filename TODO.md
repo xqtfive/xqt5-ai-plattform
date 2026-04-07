@@ -329,10 +329,13 @@ Sourced from `kvml_test/` — the tender is not the goal, but the feature requir
   - In `llm.py`: catch provider API errors → retry with configured fallback model
   - Admin UI to configure fallback per provider; log fallback events to audit log
 
-- [ ] 🟠 **Web search toggle** — ~2 days
+- [ ] 🟠 **Web search toggle** — ~3 days *(NOW: MK2)*
   - Integrate Brave Search API or Serper API
   - Per-conversation toggle (user) + default setting (admin)
   - Append search results to system prompt as context; show sources in citations
+  - User-configurable filters per search: domain whitelist (e.g. trusted sources only), time range (last week/month/year/any), compliance mode toggle (excludes non-verifiable sources)
+  - Admin can set default filter presets; user overrides per conversation
+  - Filter state persisted per conversation in `app_conversations.search_filter_config jsonb`
 
 - [ ] 🟠 **Audit log — extend to append-only** — ~0.5 days
   - `app_audit_logs` table, `audit.py` module, and admin UI table view already exist; LLM calls, logins, and admin actions are already logged
@@ -378,6 +381,38 @@ Sourced from `kvml_test/` — the tender is not the goal, but the feature requir
 
 - [ ] 🟡 **Speech-to-text input** — ~2 days, 20 pts
   - Web Speech API (browser-native); microphone button in chat input
+
+- [ ] 🟠 **Image generation** — ~4 days *(NOW: MK5)*
+  - Integrate at least one image generation provider (e.g. DALL-E 3 via OpenAI API, or Stability AI)
+  - Image generation UI in chat: dedicated input mode, prompt field, optional style/size selectors
+  - Admin: enable/disable per provider, configure allowed models, set corporate style presets (brand colours, forbidden content categories)
+  - Generated images displayed inline in chat; downloadable
+  - No upload of sensitive image data to external services — generation-only, no inbound image processing in this feature
+  - Provider key managed via existing encrypted key storage in DB
+
+- [ ] 🟠 **UI localisation (German)** — ~1 day *(NOW: MK1)*
+  - All UI strings (buttons, labels, placeholders, error messages, onboarding) available in German
+  - Language toggle in user settings; default determined by browser locale or admin config
+  - Minimum: full German language file covering all current UI surfaces
+  - Implementation: extract hardcoded strings into a locale object (`de.js` / `en.js`), load at runtime
+
+- [ ] 🟠 **No-code agent / workflow editor** — ~5–7 days *(NOW: MK4)*
+  - Visual editor for non-technical users to define multi-step agent workflows: chain tools, set conditions, define input/output mappings
+  - Each workflow node can be: LLM call, web search, RAG lookup, MCP tool call, code execution, conditional branch
+  - Workflows saved as JSON in DB, executable as a custom assistant
+  - UI: drag-and-drop canvas or sequential step list (step list is lower effort and sufficient for initial version)
+  - Depends on MCP support for tool execution
+  - File: new `WorkflowEditor.jsx`, `workflows.py` router, `app_workflows` table
+
+- [ ] 🟠 **SharePoint RAG connector** — ~4–5 days *(NOW: KK2)*
+  - Connect to Microsoft SharePoint via Microsoft Graph API (`/sites/{site}/drives/{drive}/items`)
+  - Auth: OAuth 2.0 with delegated permissions (user selects which SharePoint sites/folders are accessible)
+  - User explicitly selects relevant SharePoint sources per use case — no automatic full-repository indexing
+  - Selected documents fetched, chunked and embedded into the existing RAG pipeline (stored in `app_document_chunks` as any other document)
+  - Respects SharePoint permissions: access token scope limits which files can be fetched
+  - Admin: configure allowed SharePoint tenants; user: browse and select sources in pool document manager
+  - Re-sync on schedule or on demand; track `sharepoint_item_id` + `last_modified` for incremental updates
+  - File: new `sharepoint.py` connector, integration into `documents.py` upload pipeline
 
 ---
 
