@@ -94,7 +94,6 @@ export default function NavRail({
       <div className="nav-rail-logo" onClick={onHome} style={{ cursor: 'pointer' }} title="Startseite">
         XQT<span className="nav-rail-logo-sub">5</span>
       </div>
-      <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.1em', color: '#fff', background: '#ee7f00', borderRadius: '3px', padding: '1px 5px', margin: '-6px auto 4px', width: 'fit-content' }}>PROD</div>
 
       {/* Navigation */}
       <div className="nav-rail-items">
