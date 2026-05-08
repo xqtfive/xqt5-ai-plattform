@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { api } from '../api'
 import { t } from '../i18n/strings'
+import { FileTypeIcon } from './Icon'
 
 export default function PoolDocuments({ poolId, documents, canEdit, onUpload, onUploadText, onDelete }) {
   const fileInputRef = useRef(null)
@@ -149,9 +150,7 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
           )}
           {documents.map((doc) => (
             <div key={doc.id} className={`pool-doc-item doc-status-${doc.status}`}>
-              <span className="pool-doc-icon">
-                {doc.file_type === 'pdf' ? '\u{1F4C4}' : (doc.file_type === 'image' ? '\u{1F5BC}\u{FE0F}' : '\u{1F4DD}')}
-              </span>
+              <FileTypeIcon type={doc.file_type} size={20} className="pool-doc-icon" />
               <div className="pool-doc-info">
                 <span className="pool-doc-name">{doc.filename}</span>
                 {doc.summary && (

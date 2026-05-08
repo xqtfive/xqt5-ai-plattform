@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import CreatePoolDialog from './CreatePoolDialog'
 import UsageWidget from './UsageWidget'
+import { PoolIcon } from './Icon'
 import { t } from '../i18n/strings'
 
 function IconOverview() {
@@ -182,9 +183,7 @@ export default function Sidebar({
 
         {/* Pool identity */}
         <div className="pool-nav-identity">
-          <span className="pool-nav-icon" style={{ color: activePool.color }}>
-            {activePool.icon || '📚'}
-          </span>
+          <PoolIcon emoji={activePool.icon} size={28} className="pool-nav-icon" style={{ color: activePool.color }} />
           <div>
             <div className="pool-nav-name">{activePool.name}</div>
             {activePool.description && (
@@ -293,9 +292,7 @@ export default function Sidebar({
               className={`panel-item${activePoolId === pool.id ? ' active' : ''}`}
               onClick={() => onSelectPool(pool)}
             >
-              <span className="panel-pool-icon" style={{ color: pool.color || 'var(--color-primary)' }}>
-                {pool.icon || '📚'}
-              </span>
+              <PoolIcon emoji={pool.icon} size={18} className="panel-pool-icon" style={{ color: pool.color || 'var(--color-primary)' }} />
               <div className="panel-item-body">
                 <span className="panel-item-title">{pool.name}</span>
                 <span className="panel-item-sub">{pool.role}</span>

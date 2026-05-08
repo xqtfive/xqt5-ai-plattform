@@ -218,3 +218,30 @@ Die Upload-Endpunkte in `main.py` sind synchron — der HTTP-Request blockiert b
 Längerfristig wäre ein async-Background-Worker mit Status-Poll-Endpunkt der saubere Fix (in TODO als Folge-Aufgabe).
 
 Dateien: `backend/app/rag.py`, `backend/app/main.py`, `backend/app/documents.py`, `frontend/src/components/DocumentList.jsx`, `frontend/src/components/PoolDocuments.jsx`, `frontend/src/components/PoolDetail.jsx`, `frontend/src/App.jsx`, `frontend/src/styles.css`, `frontend/src/i18n/strings.js`
+
+---
+
+## Line-Art-Icon-System für Pool- und Datei-Icons (2026-05-07)
+
+Ablösung der bisherigen Emoji-Icons (📚, 📖, 🗂️, 📁, 🚀, ⭐, 💡, 🎯 für Pools; 📄, 🖼️, 📝 für Datei-Typen) durch konsistente Line-Art-SVGs im Stil der nav-rail-Icons. Begründung: die bunten Emoji-Icons passten nicht zum sonstigen Design (sauber, monochrom, single-stroke).
+
+**Komponente:** `frontend/src/components/Icon.jsx` (neu) — exportiert zwei React-Komponenten `<PoolIcon emoji="..." />` und `<FileTypeIcon type="..." />`, plus 11 interne SVG-Komponenten (8 Pool-Icons + 3 Datei-Typen).
+
+**Designvorgaben:**
+- 24x24 viewBox, `stroke="currentColor"` damit Farbe über Container-CSS vererbt
+- Stiftbreite 1.6 (gleich wie nav-rail)
+- Pool-Default („Bücher") = drei stehende Bücher in gestaffelten Höhen (höchstes links, kleinstes Mitte, mittleres rechts) mit vertikalen Titel-Linien im unteren Drittel jedes Buchrückens
+- Datei-Typ „PDF" = blanke Dokument-Silhouette mit Eckfalz (keine Inhaltszeilen)
+- Datei-Typ „Text/Notiz" = Dokument-Silhouette + zwei Schreibzeilen + Stift (Rechteck-Körper mit Dreieck-Spitze, weiße Füllung deckt Doc-Inhalt darunter ab, Spitze endet exakt am Ende der zweiten Zeile)
+
+**Einfacher Rückweg:** in `Icon.jsx` ist die Konstante `LINE_ICONS_ENABLED = true` ganz oben definiert. Auf `false` setzen → die gesamte UI rendert wieder Emojis, ohne DB-Migration. Datenbank-Werte (Pool-Icon-Spalte) bleiben unverändert — der Toggle ist rein render-seitig.
+
+**Verdrahtung in 7 bestehenden Komponenten:**
+- `Sidebar.jsx` — 2 Stellen (Pool-Identity-Bereich + Pool-Liste-Items)
+- `PoolList.jsx`, `PoolHeader.jsx`, `PoolOverview.jsx` — jeweils 1 Pool-Icon
+- `CreatePoolDialog.jsx` — Icon-Picker rendert SVGs für die 8 Auswahloptionen (DB-Werte bleiben Emoji-Strings)
+- `DocumentList.jsx`, `PoolDocuments.jsx` — Datei-Typ-Icons in Dokument-Zeilen
+
+**Vorschau-Datei:** `frontend/dev-tools/icon-preview.html` zeigt alle Icons in 15px/28px/48px nebeneinander mit Emoji-Vergleich. Reines Dev-Tool, wird nicht ausgeliefert.
+
+Dateien: `frontend/src/components/Icon.jsx` (neu), `frontend/src/components/Sidebar.jsx`, `frontend/src/components/PoolList.jsx`, `frontend/src/components/PoolHeader.jsx`, `frontend/src/components/PoolOverview.jsx`, `frontend/src/components/CreatePoolDialog.jsx`, `frontend/src/components/DocumentList.jsx`, `frontend/src/components/PoolDocuments.jsx`, `frontend/dev-tools/icon-preview.html` (neu)

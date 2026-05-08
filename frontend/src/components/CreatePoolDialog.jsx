@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PoolIcon } from './Icon'
 
 const ICONS = ['\u{1F4DA}', '\u{1F4D6}', '\u{1F5C2}', '\u{1F4C1}', '\u{1F680}', '\u{2B50}', '\u{1F4A1}', '\u{1F3AF}']
 const COLORS = ['#ee7f00', '#4CAF50', '#2196F3', '#9C27B0', '#F44336', '#607D8B', '#795548', '#FF9800']
@@ -70,7 +71,7 @@ export default function CreatePoolDialog({ onClose, onCreate }) {
                     className={`icon-option ${icon === ic ? 'selected' : ''}`}
                     onClick={() => setIcon(ic)}
                   >
-                    {ic}
+                    <PoolIcon emoji={ic} size={22} />
                   </button>
                 ))}
               </div>

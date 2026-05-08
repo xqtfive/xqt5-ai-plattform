@@ -1,4 +1,5 @@
 import { t } from '../i18n/strings'
+import { FileTypeIcon } from './Icon'
 
 export default function DocumentList({ documents, onDelete }) {
   if (!documents || documents.length === 0) return null
@@ -11,9 +12,7 @@ export default function DocumentList({ documents, onDelete }) {
           className={`document-item doc-status-${doc.status}`}
           title={doc.error_message || doc.summary || `${doc.chunk_count} chunks`}
         >
-          <span className="doc-icon">
-            {doc.file_type === 'pdf' ? '\u{1F4C4}' : (doc.file_type === 'image' ? '\u{1F5BC}\u{FE0F}' : '\u{1F4DD}')}
-          </span>
+          <FileTypeIcon type={doc.file_type} size={15} className="doc-icon" />
           <span className="doc-name">{doc.filename}</span>
           {doc.status === 'ready' && (
             <span className="doc-chunks">{doc.chunk_count}</span>

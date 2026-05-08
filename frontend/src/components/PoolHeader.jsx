@@ -1,4 +1,5 @@
 import { t } from '../i18n/strings'
+import { PoolIcon } from './Icon'
 
 // ── Inline SVG icons matching the 13–15px size used in Sidebar.jsx ────────────
 
@@ -49,20 +50,18 @@ export default function PoolHeader({ pool, counts, members, onTabChange }) {
   const visibleMembers = (members || []).slice(0, MAX_VISIBLE_AVATARS)
   const overflowCount = (members || []).length - MAX_VISIBLE_AVATARS
 
-  const safeIcon = pool.icon || '■'
   const safeCounts = counts || { docs: 0, chats: 0, members: 0 }
 
   return (
     <div className="pool-header">
       {/* Identity: icon + name + description */}
       <div className="pool-header-identity">
-        <span
+        <PoolIcon
+          emoji={pool.icon}
+          size={28}
           className="pool-header-icon"
           style={{ color: pool.color || 'var(--color-primary)' }}
-          aria-hidden="true"
-        >
-          {safeIcon}
-        </span>
+        />
         <div className="pool-header-text">
           <span className="pool-header-name">{pool.name}</span>
           {pool.description && (
