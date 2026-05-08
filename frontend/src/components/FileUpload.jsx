@@ -27,7 +27,7 @@ export default function FileUpload({ chatId, onUploadComplete, disabled }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.txt,.png,.jpg,.jpeg,.webp"
+        accept=".pdf,.txt,.md,.csv,.docx,.xlsx,.png,.jpg,.jpeg,.webp"
         onChange={handleFileChange}
         style={{ display: 'none' }}
       />
@@ -36,7 +36,7 @@ export default function FileUpload({ chatId, onUploadComplete, disabled }) {
         type="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={disabled || uploading}
-        title="Upload PDF, TXT or image"
+        title="Upload PDF, Office (DOCX/XLSX), CSV, Markdown, TXT or image"
       >
         {uploading ? '⏳' : '\u{1F4CE}'}
       </button>

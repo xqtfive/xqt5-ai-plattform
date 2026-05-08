@@ -55,16 +55,24 @@ def guess_image_mime(filename: str) -> str:
 
 
 async def extract_text(filename: str, file_bytes: bytes) -> str:
-    """Extract text from PDF or TXT file.
+    """Extract text from a supported file.
 
-    PDFs and images are always processed via Mistral OCR.
+    PDFs and images go through Mistral OCR. Plain text formats are decoded as
+    UTF-8. Office formats (.docx, .xlsx) and tabular .csv are converted to
+    markdown so the chunker preserves headings and table boundaries.
     """
     lower = filename.lower()
     if lower.endswith(".pdf"):
         text, _ = await _ocr_pdf_mistral_with_assets(file_bytes, filename)
         return text
-    elif lower.endswith(".txt"):
+    elif lower.endswith(".txt") or lower.endswith(".md"):
         return file_bytes.decode("utf-8", errors="replace")
+    elif lower.endswith(".csv"):
+        return _extract_csv_text(file_bytes)
+    elif lower.endswith(".docx"):
+        return _extract_docx_text(file_bytes)
+    elif lower.endswith(".xlsx"):
+        return _extract_xlsx_text(file_bytes)
     elif is_supported_image(lower):
         return await _ocr_image_mistral(file_bytes, filename, guess_image_mime(filename))
     else:
@@ -76,16 +84,126 @@ async def extract_text_and_assets(
     file_bytes: bytes,
     user_id: Optional[str] = None,
 ) -> Tuple[str, List[Dict[str, Any]]]:
-    """Extract text and OCR-derived image assets from a file."""
+    """Extract text and OCR-derived image assets from a file.
+
+    Office and text formats currently return no assets — image extraction
+    stays PDF-only until OCR pipeline v2 (Docling/Granite-Docling) lands.
+    """
     lower = filename.lower()
     if lower.endswith(".pdf"):
         return await _ocr_pdf_mistral_with_assets(file_bytes, filename, user_id=user_id)
-    if lower.endswith(".txt"):
+    if lower.endswith(".txt") or lower.endswith(".md"):
         return file_bytes.decode("utf-8", errors="replace"), []
+    if lower.endswith(".csv"):
+        return _extract_csv_text(file_bytes), []
+    if lower.endswith(".docx"):
+        return _extract_docx_text(file_bytes), []
+    if lower.endswith(".xlsx"):
+        return _extract_xlsx_text(file_bytes), []
     if is_supported_image(lower):
         text = await _ocr_image_mistral(file_bytes, filename, guess_image_mime(filename), user_id=user_id)
         return text, []
     raise ValueError(f"Unsupported file type: {filename}")
+
+
+def _md_table_row(cells: List[str], width: int) -> str:
+    padded = list(cells) + [""] * (width - len(cells))
+    cleaned = [c.replace("|", "\\|").replace("\n", " ").replace("\r", "") for c in padded[:width]]
+    return "| " + " | ".join(cleaned) + " |"
+
+
+def _rows_to_md_table(rows: List[List[str]]) -> str:
+    """Format a list-of-rows as a Markdown table with header + separator.
+
+    Empty input returns an empty string. Width is taken from the longest row;
+    shorter rows are right-padded with empty cells so the table stays valid.
+    """
+    if not rows:
+        return ""
+    width = max(len(r) for r in rows)
+    if width == 0:
+        return ""
+    header = _md_table_row(rows[0], width)
+    sep = "| " + " | ".join(["---"] * width) + " |"
+    body = [_md_table_row(r, width) for r in rows[1:]]
+    return "\n".join([header, sep, *body])
+
+
+def _extract_csv_text(file_bytes: bytes) -> str:
+    """Decode a CSV file as UTF-8 and emit it as a Markdown table.
+
+    csv.Sniffer picks the delimiter (comma/semicolon/tab) automatically. When
+    the sniffer cannot tell, falls back to comma.
+    """
+    import csv as _csv
+    text = file_bytes.decode("utf-8-sig", errors="replace")
+    sample = text[:4096]
+    try:
+        dialect = _csv.Sniffer().sniff(sample, delimiters=",;\t|")
+    except _csv.Error:
+        dialect = _csv.excel
+    reader = _csv.reader(text.splitlines(), dialect)
+    rows = [list(r) for r in reader if any((c or "").strip() for c in r)]
+    return _rows_to_md_table(rows)
+
+
+def _extract_docx_text(file_bytes: bytes) -> str:
+    """Walk a .docx in document order, emitting paragraphs (with heading
+    levels promoted to Markdown #) and tables as Markdown.
+    """
+    from docx import Document
+    from docx.table import Table
+
+    doc = Document(BytesIO(file_bytes))
+    parts: List[str] = []
+    for content in doc.iter_inner_content():
+        if isinstance(content, Table):
+            rows = [[cell.text.strip() for cell in row.cells] for row in content.rows]
+            md = _rows_to_md_table(rows)
+            if md:
+                parts.append(md)
+            continue
+        # Paragraph
+        text = (content.text or "").strip()
+        if not text:
+            continue
+        style = (content.style.name if content.style else "") or ""
+        if style.startswith("Heading "):
+            try:
+                level = int(style.split()[-1])
+                text = "#" * max(1, min(level, 6)) + " " + text
+            except (ValueError, IndexError):
+                pass
+        elif style == "Title":
+            text = "# " + text
+        parts.append(text)
+    return "\n\n".join(parts)
+
+
+def _extract_xlsx_text(file_bytes: bytes) -> str:
+    """Read an .xlsx with openpyxl in read-only/data-only mode and emit each
+    sheet as a Markdown ## heading followed by a Markdown table of its cells.
+    Trailing all-empty rows are stripped per sheet.
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(BytesIO(file_bytes), read_only=True, data_only=True)
+    parts: List[str] = []
+    for sheet_name in wb.sheetnames:
+        ws = wb[sheet_name]
+        rows: List[List[str]] = []
+        for row in ws.iter_rows(values_only=True):
+            rows.append(["" if v is None else str(v) for v in row])
+        while rows and all(c == "" for c in rows[-1]):
+            rows.pop()
+        if not rows:
+            continue
+        parts.append(f"## {sheet_name}")
+        md = _rows_to_md_table(rows)
+        if md:
+            parts.append(md)
+    wb.close()
+    return "\n\n".join(parts)
 
 
 async def _ocr_pdf_mistral(file_bytes: bytes, filename: str) -> str:

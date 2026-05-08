@@ -1350,6 +1350,28 @@ def build_rag_context(
             skipped, max_tokens,
         )
 
+    # phase3=true Phase 3 observability — temporary; remove or gate behind
+    # log-level=DEBUG once verification matrix in docs/tests/phase3/ is signed off.
+    # Lets us confirm at runtime that the multi-doc-bias fix and the RRF sort key
+    # are surfacing chunks across multiple documents.
+    logger.info(
+        "phase3=true RAG surviving chunks (n=%d): %s",
+        len(surviving),
+        [
+            {
+                "id": c.get("id"),
+                "doc": c.get("document_id"),
+                "idx": c.get("chunk_index"),
+                "sim": round(float(c.get("similarity", 0.0) or 0.0), 4),
+                "rrf": round(float(c.get("rrf_score", 0.0) or 0.0), 4),
+                "rerank": round(float(c.get("rerank_score", 0.0) or 0.0), 4),
+                "tok": c.get("token_count"),
+                "neighbor": bool(c.get("is_neighbor", False)),
+            }
+            for c in surviving
+        ],
+    )
+
     return "<documents>\n" + "\n".join(doc_parts) + "\n</documents>", surviving
 
 

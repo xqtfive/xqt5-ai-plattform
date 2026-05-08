@@ -152,9 +152,12 @@ const FILE_TYPE_ICONS = {
 }
 
 // ── Chat-list icons (used in PoolChatList) ──
+//
+// Both are toggle-aware: when LINE_ICONS_ENABLED is false they fall back to
+// the original colourful emoji (globe for shared, padlock for private), so
+// flipping the switch reverts the pool chat list along with everything else.
 
-/** Speech bubble — denotes a shared / multi-user chat. */
-export function ChatBubbleIcon({ size = 15 }) {
+function ChatBubbleSvg({ size }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -162,13 +165,71 @@ export function ChatBubbleIcon({ size = 15 }) {
   )
 }
 
-/** Closed padlock — denotes a private chat (only the creator sees it). */
-export function LockIcon({ size = 15 }) {
+function LockSvg({ size }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <rect x="4" y="11" width="16" height="10" rx="2" />
       <path d="M8 11V7a4 4 0 0 1 8 0v4" />
     </svg>
+  )
+}
+
+/** Speech bubble — denotes a shared / multi-user chat. */
+export function ChatBubbleIcon({ size = 15, className, style }) {
+  if (!LINE_ICONS_ENABLED) {
+    return (
+      <span className={className} style={{ fontSize: `${size}px`, lineHeight: 1, ...style }}>
+        {'\u{1F30D}'}
+      </span>
+    )
+  }
+  return (
+    <span className={className} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, ...style }}>
+      <ChatBubbleSvg size={size} />
+    </span>
+  )
+}
+
+/** Closed padlock — denotes a private chat (only the creator sees it). */
+export function LockIcon({ size = 15, className, style }) {
+  if (!LINE_ICONS_ENABLED) {
+    return (
+      <span className={className} style={{ fontSize: `${size}px`, lineHeight: 1, ...style }}>
+        {'\u{1F512}'}
+      </span>
+    )
+  }
+  return (
+    <span className={className} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, ...style }}>
+      <LockSvg size={size} />
+    </span>
+  )
+}
+
+function GlobeSvg({ size }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="9" />
+      <ellipse cx="12" cy="12" rx="9" ry="4" />
+      <path d="M 12 3 Q 6 12 12 21" />
+      <path d="M 12 3 Q 18 12 12 21" />
+    </svg>
+  )
+}
+
+/** Globe — denotes a shared / public chat visible to all pool members. */
+export function GlobeIcon({ size = 15, className, style }) {
+  if (!LINE_ICONS_ENABLED) {
+    return (
+      <span className={className} style={{ fontSize: `${size}px`, lineHeight: 1, ...style }}>
+        {'\u{1F30D}'}
+      </span>
+    )
+  }
+  return (
+    <span className={className} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, ...style }}>
+      <GlobeSvg size={size} />
+    </span>
   )
 }
 

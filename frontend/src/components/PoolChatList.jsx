@@ -1,4 +1,4 @@
-import { ChatBubbleIcon, LockIcon } from './Icon'
+import { GlobeIcon, LockIcon } from './Icon'
 
 export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, onDeleteChat }) {
   const sharedChats = chats.filter((c) => c.is_shared)
@@ -20,7 +20,7 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
           <h4 className="pool-chat-section-title">Shared Chats</h4>
           {sharedChats.map((chat) => (
             <div key={chat.id} className="pool-chat-item" onClick={() => onOpenChat(chat.id)}>
-              <span className="pool-chat-icon"><ChatBubbleIcon size={15} /></span>
+              <span className="pool-chat-icon"><GlobeIcon size={15} /></span>
               <div className="pool-chat-info">
                 <span className="pool-chat-name">{chat.title}</span>
                 <span className="pool-chat-meta">{chat.message_count} Nachrichten</span>

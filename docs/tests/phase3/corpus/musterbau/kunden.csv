@@ -1,0 +1,51 @@
+KundenID,Name,Branche,Bundesland,JahresumsatzEUR,Akquisedatum,Hauptansprechpartner,Status
+KD-001,Heidkamp Bau GmbH,BAU,NRW,85000,2015-03-12,Holger Brandt (MA-004),aktiv
+KD-002,Nordsee-Logistik KG,LOG,HH,112000,2016-07-01,Anke Schürmann (MA-005),aktiv
+KD-003,Sachsenwerk Präzision GmbH,MAS,SAC,97000,2017-02-14,Carsten Voigt (MA-009),aktiv
+KD-004,Südthüringer Anlagentechnik GmbH,ANL,NDS,143000,2018-05-20,Nina Haverkamp (MA-010),aktiv
+KD-005,Maintal Energieservice AG,ENE,HES,188000,2014-09-08,Dirk Hammerschmidt (MA-007),aktiv
+KD-006,Berliner Stadtbau GmbH,BAU,BER,76000,2019-01-15,Anke Schürmann (MA-005),aktiv
+KD-007,Bramkamp Industrietechnik GmbH,ANL,NRW,742000,2025-04-18,Dirk Hammerschmidt (MA-007),aktiv
+KD-008,Elbe-Transport GmbH,LOG,HH,134000,2016-11-03,Nina Haverkamp (MA-010),aktiv
+KD-009,Dresdner Maschinenfabrik OHG,MAS,SAC,221000,2013-06-25,Carsten Voigt (MA-009),aktiv
+KD-010,Münchner Energieversorger AG,ENE,BAY,198000,2015-08-17,Holger Brandt (MA-004),aktiv
+KD-011,Paderborner Stahlbau GmbH,MAS,NRW,165000,2017-04-11,Dirk Hammerschmidt (MA-007),aktiv
+KD-012,Hannoversche Tiefbau AG,BAU,NDS,109000,2018-10-22,Nina Haverkamp (MA-010),aktiv
+KD-013,Frankfurter Elektro GmbH,ENE,HES,92000,2020-03-05,Anke Schürmann (MA-005),aktiv
+KD-014,Augsburger Anlagenbau KG,ANL,BAY,257000,2014-12-01,Holger Brandt (MA-004),aktiv
+KD-015,Stadtwerke Gelsenkirchen AöR,ENE,NRW,437000,2013-02-28,Carsten Voigt (MA-009),aktiv
+KD-016,Leipziger Logistik GmbH,LOG,SAC,183000,2016-05-19,Carsten Voigt (MA-009),aktiv
+KD-017,Hamburgische Bau AG,BAU,HH,201000,2015-07-30,Nina Haverkamp (MA-010),aktiv
+KD-018,Stuttgarter Sondermaschinenbau GmbH,MAS,BW,274000,2014-03-14,Holger Brandt (MA-004),aktiv
+KD-019,Kölner Infrastruktur GmbH,OEF,NRW,88000,2019-09-09,Anke Schürmann (MA-005),aktiv
+KD-020,Bremer Hafenlogistik KG,LOG,NDS,147000,2017-11-27,Nina Haverkamp (MA-010),aktiv
+KD-021,Bayerische Stahlbau GmbH,MAS,BAY,561000,2012-06-06,Holger Brandt (MA-004),aktiv
+KD-022,Nürnberger Anlagentechnik AG,ANL,BAY,312000,2015-01-20,Holger Brandt (MA-004),aktiv
+KD-023,Münster Gebäudetechnik GmbH,BAU,NRW,119000,2018-08-13,Dirk Hammerschmidt (MA-007),aktiv
+KD-024,Dresdner Energiewerke GmbH,ENE,SAC,203000,2016-04-07,Carsten Voigt (MA-009),aktiv
+KD-025,Kiel Offshore Engineering GmbH,ANL,NDS,389000,2013-10-16,Nina Haverkamp (MA-010),aktiv
+KD-026,Berliner Maschinenbau GmbH,MAS,BER,156000,2019-06-24,Anke Schürmann (MA-005),inaktiv
+KD-027,Freiburger Solartechnik GmbH,ENE,BW,167000,2017-03-03,Holger Brandt (MA-004),aktiv
+KD-028,Dortmunder Stahlhandel GmbH,MAS,NRW,94000,2020-02-18,Dirk Hammerschmidt (MA-007),aktiv
+KD-029,Hamburger Anlagenbau GmbH,ANL,HH,278000,2014-08-05,Nina Haverkamp (MA-010),aktiv
+KD-030,Münchner Bauwesen AG,BAU,BAY,131000,2018-01-09,Holger Brandt (MA-004),aktiv
+KD-031,Kasseler Maschinenbau GmbH,MAS,HES,174000,2016-09-28,Anke Schürmann (MA-005),aktiv
+KD-032,Dresdner Baufirma GmbH,BAU,SAC,88000,2021-05-12,Carsten Voigt (MA-009),inaktiv
+KD-033,Wuppertaler Logistik GmbH,LOG,NRW,122000,2017-12-04,Dirk Hammerschmidt (MA-007),aktiv
+KD-034,Rheinische Anlagenbau AG,ANL,NRW,683000,2012-11-19,Dirk Hammerschmidt (MA-007),aktiv
+KD-035,Berliner Infrastruktur AöR,OEF,BER,207000,2015-06-23,Anke Schürmann (MA-005),aktiv
+KD-036,Heidelberger Maschinenfabrik GmbH,MAS,BW,243000,2014-04-30,Holger Brandt (MA-004),aktiv
+KD-037,Niedersächsische Energieversorgung AG,ENE,NDS,319000,2013-08-11,Nina Haverkamp (MA-010),aktiv
+KD-038,Hamburger Stadtbau GmbH,BAU,HH,96000,2020-07-15,Nina Haverkamp (MA-010),aktiv
+KD-039,Regensburger Anlagentechnik OHG,ANL,BAY,188000,2016-02-22,Holger Brandt (MA-004),aktiv
+KD-040,Düsseldorfer Öffentlicher Bau AöR,OEF,NRW,141000,2018-03-07,Dirk Hammerschmidt (MA-007),aktiv
+KD-041,Mannheimer Maschinenbau AG,MAS,BW,228000,2015-10-14,Holger Brandt (MA-004),aktiv
+KD-042,Potsdamer Infrastruktur GmbH,OEF,BER,103000,2019-11-20,Anke Schürmann (MA-005),aktiv
+KD-043,Erfurter Logistikzentrum GmbH,LOG,NDS,77000,2021-01-08,Nina Haverkamp (MA-010),inaktiv
+KD-044,Karlsruher Energieversorgung GmbH,ENE,BW,194000,2016-06-17,Holger Brandt (MA-004),aktiv
+KD-045,Bochumer Stahlwerk GmbH,MAS,NRW,258000,2013-04-03,Dirk Hammerschmidt (MA-007),aktiv
+KD-046,Chemnitzer Anlagenbau GmbH,ANL,SAC,166000,2017-09-25,Carsten Voigt (MA-009),aktiv
+KD-047,Berliner Logistik GmbH,LOG,BER,143000,2018-12-12,Anke Schürmann (MA-005),aktiv
+KD-048,Münchner Logistikzentrum KG,LOG,BAY,209000,2015-05-06,Holger Brandt (MA-004),aktiv
+KD-049,Kölner Maschinenbau AG,MAS,NRW,177000,2017-07-21,Dirk Hammerschmidt (MA-007),aktiv
+KD-050,Wiesbadener Energiepartner GmbH,ENE,HES,138000,2019-04-16,Anke Schürmann (MA-005),prospekt

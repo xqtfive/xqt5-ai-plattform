@@ -74,7 +74,11 @@ from .token_tracking import record_usage
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="XQT5 AI-Workplace API")
-SUPPORTED_UPLOAD_EXTENSIONS = (".pdf", ".txt", ".png", ".jpg", ".jpeg", ".webp")
+SUPPORTED_UPLOAD_EXTENSIONS = (
+    ".pdf", ".txt", ".md",
+    ".csv", ".docx", ".xlsx",
+    ".png", ".jpg", ".jpeg", ".webp",
+)
 MAX_OCR_ASSET_EMBEDDINGS = 40
 
 
@@ -83,12 +87,24 @@ def _is_supported_upload_file(filename: str) -> bool:
     return any(lower.endswith(ext) for ext in SUPPORTED_UPLOAD_EXTENSIONS)
 
 
+# Map extension → short file_type label persisted on the document row. The UI
+# uses this to pick an icon (FileTypeIcon in Icon.jsx) and to decide whether to
+# trigger image-specific behaviour (e.g. asset embeddings).
+_FILE_TYPE_BY_EXT = {
+    ".pdf": "pdf",
+    ".txt": "txt",
+    ".md": "md",
+    ".csv": "csv",
+    ".docx": "docx",
+    ".xlsx": "xlsx",
+}
+
+
 def _resolve_file_type(filename: str) -> str:
     lower = (filename or "").lower()
-    if lower.endswith(".pdf"):
-        return "pdf"
-    if lower.endswith(".txt"):
-        return "txt"
+    for ext, label in _FILE_TYPE_BY_EXT.items():
+        if lower.endswith(ext):
+            return label
     return "image"
 
 

@@ -1,0 +1,42 @@
+Technische Umsetzung und Projektzeitplan — Großauftrag KD-007, Bramkamp Industrietechnik GmbH
+
+Der Auftrag mit Bramkamp Industrietechnik GmbH wurde am 18. April 2025 in Hamm unterzeichnet.
+Der Vertragsrahmen schreibt eine Pilotphase von sechs Wochen vor, bevor der Vollbetrieb beginnt.
+In dieser Zeit kalibriert die Engineering-Abteilung das PIMS-A-System auf die spezifischen
+Prozesskenngrößen der Bramkamp-Anlagen. Tobias Wernecke (MA-011) übernahm persönlich die
+technische Projektleitung für die Erstinstallation.
+
+Die Installation umfasst zwei Produktionsbereiche: den Pressbereich (Halle A) und den
+Montagebereich (Halle C). In Halle A werden 18 der 24 PIMS-A-Kanäle belegt; Halle C
+nutzt die verbleibenden sechs Kanäle für Drehmomentsensoren und Temperaturfühler an
+den Montagepressen. Die Gesamtzahl der angebundenen Messpunkte liegt bei 312.
+
+Im Pressbereich waren bei der Erstinstallation drei Pumpengruppen vorhanden, für die das
+Kavitationsschutzprotokoll aus technischen Sicherheitsgründen verbindlich konfiguriert
+wurde. Die Konfiguration erfolgte durch Sven Unterberg (MA-012), der auch die
+Kalibrierung nach dem internen Drewermann-Verfahren durchführte.
+
+Das PIMS-D-Modul wird auf Basis der im ersten Betriebshalbjahr gesammelten Sensordaten
+für das Predictive-Maintenance-Modell trainiert. Bramkamp erwartet, durch vorausschauende
+Wartung die ungeplanten Stillstandzeiten im Pressbereich um mindestens 30 % zu senken.
+Musterbau hat dieses Ziel als Leistungskennzahl im Servicevertrag verankert; Verfehlung
+führt zu anteiliger Gutschrift.
+
+Risiken: Der straffe Zeitplan der Pilotphase birgt das Risiko, dass die Kalibrierungsdaten
+noch nicht vollständig stationäre Betriebsbedingungen widerspiegeln. Tobias Wernecke hat
+für diesen Fall eine verlängerte Beobachtungsphase von zwei weiteren Wochen eingeplant,
+die ohne Mehrkosten gewährt wird.
+
+Ein zweites Risiko betrifft die Netzwerkintegration: Bramkamp betreibt ein segmentiertes
+Industrienetz nach IEC 62443. PIMS-A muss in das Netzwerksegment Zone 2 eingebettet werden.
+Oliver Großmann (MA-025) koordiniert die IT-technische Abstimmung mit dem Bramkamp-IT-Team.
+
+Dirk Hammerschmidt (MA-007) führt monatliche Jour-fixe-Termine mit der Projektleitung bei
+Bramkamp durch. Die Protokolle dieser Termine gehen an Sabine Rühle (MA-006) und
+Werner Kahlert (MA-001). Der erste Meilensteinbericht, sechs Monate nach Vertragsstart,
+war für Oktober 2025 geplant und wurde fristgerecht übergeben. Der Bericht bestätigt
+die Einhaltung aller technischen Lieferziele.
+
+Finanziell läuft der Auftrag planmäßig. Der Jahresumsatz von 742.000 € setzt sich zusammen
+aus Lizenzgebühren (480.000 €), Wartungspauschalen (162.000 €) und Beratungsleistungen
+(100.000 €). Der erste Jahresbetrag wurde vollständig fakturiert und bezahlt.

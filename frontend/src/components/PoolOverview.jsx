@@ -1,5 +1,4 @@
 import { t } from '../i18n/strings'
-import { PoolIcon } from './Icon'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -87,18 +86,20 @@ export default function PoolOverview({
           <span className="pool-overview-section-title">{t('pool.overview.section.summary')}</span>
         </div>
         <div className="pool-overview-summary">
-          <PoolIcon
-            emoji={pool.icon}
-            size={32}
-            className="pool-overview-summary-icon"
-            style={{ color: pool.color || 'var(--color-primary)' }}
-          />
           <div className="pool-overview-summary-body">
-            <span className="pool-overview-summary-name">{pool.name}</span>
+            <span className="pool-overview-summary-name">
+              {t('pool.overview.summary.name_label')}"{pool.name}"
+            </span>
+            <span className="pool-overview-summary-counts">
+              {safeDocs.length} {t('pool.overview.summary.docs')}
+              {' · '}
+              {safeChats.length} {t('pool.overview.summary.chats_count')}
+              {' · '}
+              {safeMembers.length} {t('pool.overview.summary.members_count')}
+            </span>
             {pool.description && (
               <p className="pool-overview-summary-desc">{pool.description}</p>
             )}
-            <RoleBadge role={pool.role || 'viewer'} />
           </div>
         </div>
       </div>

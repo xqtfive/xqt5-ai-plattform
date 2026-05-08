@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import MessageBubble from './MessageBubble'
+import { GlobeIcon, LockIcon } from './Icon'
 
 function IconSend() {
   return (
@@ -73,7 +74,7 @@ export default function PoolChatArea({
           &larr; Zurück
         </button>
         <span className="pool-chat-title">
-          {chat.is_shared ? '🌍' : '🔒'} {chat.title}
+          {chat.is_shared ? <GlobeIcon size={16} /> : <LockIcon size={16} />} {chat.title}
         </span>
       </div>
 

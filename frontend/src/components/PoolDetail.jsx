@@ -140,6 +140,7 @@ export default function PoolDetail({
   async function handleOpenChat(chatId) {
     setError('')
     setLoading(true)
+    onTabChange('chats')
     try {
       const chat = await api.getPoolChat(pool.id, chatId)
       setActiveChat(chat)

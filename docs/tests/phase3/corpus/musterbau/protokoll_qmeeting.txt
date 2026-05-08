@@ -1,0 +1,172 @@
+PROTOKOLL — KOMBINIERTE QUARTALS- UND AUDIT-NACHBESPRECHUNG
+Musterbau GmbH, Dortmund
+
+Datum der Sitzung: 22.05.2025 (Tagesordnungspunkte 1–3) und 15.09.2025 (Tagesordnungspunkte 4–6)
+Protokollführung: Petra Jähnig (MA-003), Assistenz Geschäftsführung
+Ort: Dortmund, Firmensitz, Konferenzraum 1. Etage
+
+---
+
+ANWESEND (Gesamtliste über beide Sitzungsteile):
+
+- Werner Kahlert (MA-001), Geschäftsführer
+- Dr. Monika Steinhoff (MA-002), CFO (ab 01.04.2025)
+- Tobias Wernecke (MA-011), Engineering-Leiter
+- Franz-Josef Metzler (MA-016), Produktionsleiter (Meister)
+- Sandra Kemper (MA-019), Qualitätssicherung
+- Inga Hollmann (MA-022), Verwaltungsleiterin / HR-Lead
+- Sabine Rühle (MA-006), Vertriebsleiterin (Sitzungsteil 15.09. zugeschaltet)
+
+Entschuldigt: Ursula Grentrup (MA-017), Ralf Overbeck (MA-020)
+
+---
+
+TAGESORDNUNG
+
+1. Nachbesprechung Zertifizierungsaudit ISO 9001 (E-04, 22.05.2025)
+2. Maßnahmenplan Audit-Feststellungen
+3. Sonstiges zum Audit
+4. Q3-Review: Umsatz- und Ertragslage per 30.09.2025 (E-06)
+5. Produktions-Workshop-Ergebnisse und Bestandsmanagement (E-07)
+6. Nächste Schritte und Terminvorschau
+
+---
+
+ZUM PROTOKOLL
+
+Dieses Dokument fasst die Beschlüsse und wesentlichen Diskussionspunkte beider Sitzungstermine
+zusammen, da thematisch enge Verbindungen bestehen.
+
+---
+
+TOP 1 — NACHBESPRECHUNG ZERTIFIZIERUNGSAUDIT ISO 9001 (E-04)
+
+Franz-Josef Metzler (MA-016) berichtete über den Verlauf des Zertifizierungsaudits vom
+22.05.2025. Das Audit wurde durch den externen Gutachter der DQS GmbH durchgeführt.
+Ergebnis: Rezertifizierung nach DIN EN ISO 9001:2015 wurde ohne Auflagen erteilt.
+
+Sandra Kemper (MA-019) erläuterte die Auditfeststellungen im Einzelnen. Der Auditor hatte
+insbesondere die Kalibrierverfahren für die PIMS-A-Messkette positiv hervorgehoben. Als
+Prüfmethode für die 24-Kanal-Kalibrierung wurde das Drewermann-Verfahren im Auditbericht
+ausdrücklich erwähnt und als normkonform eingestuft.
+
+Tobias Wernecke (MA-011) ergänzte, dass die Engineering-Abteilung die Drewermann-Verfahren-
+Dokumentation im Vorfeld des Audits auf den aktuellen Stand der DIN EN ISO 9001:2015 gebracht
+hatte. Claudia Hölscher und Sven Unterberg hätten die technische Dokumentation überarbeitet.
+
+Inga Hollmann (MA-022) wies darauf hin, dass die Rezertifizierung unmittelbar Einfluss auf
+laufende Ausschreibungsverfahren hat: mehrere öffentliche Auftraggeber im Segment OEF setzen
+ISO-9001-Zertifizierung als Mindestanforderung voraus.
+
+BESCHLUSS TOP 1: Auditbericht wird im Qualitätsmanagementsystem abgelegt und an alle
+Abteilungsleiter verteilt. Verantwortlich: Sandra Kemper (MA-019). Frist: 30.05.2025.
+
+---
+
+TOP 2 — MASSNAHMENPLAN AUDIT-FESTSTELLUNGEN
+
+Der Auditor hatte drei Verbesserungspotenziale (keine Abweichungen) benannt:
+
+a) Dokumentationslücke im Bereich Lieferantenbewertung — Maßnahme: Formular überarbeiten
+   (Verantwortlich: Inga Hollmann, MA-022; Frist: 30.06.2025)
+b) Schulungsnachweis für zwei neue Mitarbeiter fehlend — Maßnahme: Nachschulung terminieren
+   (Verantwortlich: Inga Hollmann, MA-022; Frist: 15.06.2025)
+c) Revision der Notfallprozedur für Linie 3 empfohlen — Maßnahme: Abstimmung zwischen
+   Produktion und Engineering (Verantwortlich: Franz-Josef Metzler, MA-016; Frist: 31.07.2025)
+
+Werner Kahlert (MA-001) bat um Zwischenbericht in der nächsten Sitzungsrunde.
+
+---
+
+TOP 3 — SONSTIGES ZUM AUDIT
+
+Dr. Monika Steinhoff (MA-002) informierte über die Auswirkungen der Rezertifizierung auf
+die laufende Bonitätsprüfung durch die Hausbank. Die Bank berücksichtigt ISO-Zertifizierungen
+als positiven Faktor bei der Kreditlinienbewertung.
+
+Kein weiterer Redebedarf. TOP 3 abgeschlossen.
+
+---
+
+TOP 4 — Q3-REVIEW: UMSATZ UND ERTRAGSLAGE PER 30.09.2025 (E-06)
+
+Dr. Monika Steinhoff (MA-002) präsentierte die vorläufigen Q3-Ergebnisse:
+
+- Q3-Umsatz: 4.920.000 € (Quartalsziel: 4.600.000 €; Übertreffen um 6,9 %)
+- Kumulierter Umsatz per 30.09.2025: 13.870.000 €
+- Jahresprognose auf Basis Q1–Q3: 18.490.000 € (nahe am Jahresplan von 18.450.000 €)
+- EBIT-Marge Q3: 8,6 % (Jahresziel: 8,4 %)
+
+Sabine Rühle (MA-006) berichtete, dass der Großauftrag von Bramkamp Industrietechnik GmbH
+(KD-007) planmäßig läuft und die vereinbarten Abrufmengen für PIMS-A und PIMS-D eingehalten
+werden. Auch Stadtwerke Gelsenkirchen AöR (KD-015) haben im Q3 ihre Wartungsverträge
+verlängert und zusätzliche Serviceleistungen abgerufen.
+
+Franz-Josef Metzler (MA-016) meldete für die Produktion, dass die Kapazitätsauslastung
+im Q3 bei 91 % lag. Lieferzeiten konnten trotz gestiegener Nachfrage eingehalten werden.
+
+Dr. Monika Steinhoff (MA-002) wies auf die Quartalsadaptionsklausel hin, die in mehreren
+Rahmenverträgen mit Großkunden verankert ist. Die Quartalsadaptionsklausel ermöglicht
+quartalsweise Preisanpassungen basierend auf dem Erzeugerpreisindex Maschinenbau. Für Q4
+sei eine Anpassung von +1,2 % vorgesehen. Kunden wurden bereits informiert.
+
+Tobias Wernecke (MA-011) ergänzte, dass die Quartalsadaptionsklausel in den Vertragsmustern
+klar formuliert sei; bei KD-007 und KD-015 sei sie widerspruchslos akzeptiert worden.
+
+BESCHLUSS TOP 4: Q3-Ergebnisse werden in die Hochrechnung übernommen. Jahresprognose
+wird mit 18.490.000 € als Best-Estimate kommuniziert. Jahresabschlussbesprechung für
+Dezember terminieren. Verantwortlich: Dr. Monika Steinhoff (MA-002).
+
+---
+
+TOP 5 — PRODUKTIONS-WORKSHOP-ERGEBNISSE UND BESTANDSMANAGEMENT (E-07)
+
+Franz-Josef Metzler (MA-016) berichtete über den Produktionsoptimierungs-Workshop vom
+03.11.2025. An dem Workshop waren neben ihm Ursula Grentrup (MA-017), Ahmed Yilmaz (MA-018)
+und Gregor Stenzel (MA-029) beteiligt.
+
+Wesentliches Ergebnis des Workshops: Einführung des Retrograden Bestandsabgleichs als
+neues Standardverfahren für die rückwärtsgerichtete Lagerkontrolle. Der Retrograde
+Bestandsabgleich prüft ausgehend von fertiggestellten Produkten rückwärts, ob alle
+verbrauchten Materialien korrekt aus dem Lager ausgebucht wurden. Bisherige Vorwärts-
+buchungen hatten zu wiederkehrenden Abweichungen zwischen Lagerbestand und Buchungsstand
+geführt.
+
+Ralf Overbeck (MA-020) hatte den konzeptionellen Rahmen für den Retrograden Bestandsabgleich
+vorab ausgearbeitet. Die operative Einführung ist für den 01.01.2026 geplant.
+
+Tobias Wernecke (MA-011) berichtete aus Engineering-Sicht: Im Rahmen des Workshops wurde
+außerdem das Kavitationsschutzprotokoll für Linie 3 freigegeben. Das Kavitationsschutzprotokoll
+schützt die Pumpenkomponenten von Linie 3 vor Schäden durch Kavitation. Gregor Stenzel (MA-029)
+als Instandhaltungstechniker hatte die technische Umsetzung vorbereitet; Tobias Wernecke
+(MA-011) zeichnete die Engineering-seitige Freigabe ab.
+
+Für die ERP-technische Abbildung des Retrograden Bestandsabgleichs wurde Oliver Großmann
+(MA-025) beauftragt, das notwendige Schnittstellenkonzept bis 15.12.2025 vorzulegen.
+
+BESCHLUSS TOP 5:
+- Retrograder Bestandsabgleich: Pilot in Lagerstufe 1 ab 01.01.2026; verantwortlich
+  Franz-Josef Metzler (MA-016).
+- Kavitationsschutzprotokoll Linie 3: Freigabe erteilt; Gregor Stenzel (MA-029) führt
+  die Anlaufüberwachung bis Ende November 2025 durch.
+
+---
+
+TOP 6 — NACHSTE SCHRITTE UND TERMINVORSCHAU
+
+Werner Kahlert (MA-001) fasste die offenen Punkte zusammen:
+
+1. Maßnahmen aus dem Auditbericht fristgerecht abschließen (Hollmann, Metzler)
+2. Retrograden Bestandsabgleich zum 01.01.2026 einführen (Metzler, Großmann)
+3. Jahresabschlussbesprechung: 09.12.2025, Dortmund (Bestätigung folgt)
+4. Vertragliche Quartalsadaptionsklausel für Q4 formal kommunizieren (Steinhoff, Rühle)
+5. Kavitationsschutzprotokoll Linie 3: Abschlussbericht bis 30.11.2025 (Stenzel)
+
+Nächste ordentliche Protokollsitzung: 09.12.2025 (Jahresabschlussbesprechung, E-08).
+
+---
+
+UNTERSCHRIFTEN
+
+Protokollführung: Petra Jähnig (MA-003), 17.11.2025
+Genehmigung: Werner Kahlert (MA-001), 20.11.2025
