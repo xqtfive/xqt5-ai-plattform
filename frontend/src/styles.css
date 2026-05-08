@@ -382,20 +382,22 @@ body {
   align-items: center;
   gap: 8px;
   padding: 9px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(33, 52, 82, 0.18);   /* thin light-navy box for separability — personal chats default */
   cursor: pointer;
-  transition: background var(--transition);
+  transition: background var(--transition), border-color var(--transition);
   position: relative;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .panel-item:hover {
   background: var(--color-bg);
+  border-color: rgba(33, 52, 82, 0.35);
 }
 
 .panel-item.active {
   background: rgba(238, 127, 0, 0.08);
-  border-left: 2px solid var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .panel-item-body {
@@ -452,13 +454,20 @@ body {
 }
 
 .panel-item--pool {
-  border-left: 3px solid var(--color-primary);
+  /* Replace the heavy left bar with a thin orange box around the entire row. */
+  border-color: rgba(238, 127, 0, 0.35);
+}
+
+.panel-item--pool:hover {
+  border-color: rgba(238, 127, 0, 0.6);
+}
+
+.panel-item--pool.active {
+  border-color: var(--color-primary);
 }
 
 .panel-item-pool-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  display: block;
   font-size: 11px;
   color: var(--color-text-light);
   margin-top: 2px;

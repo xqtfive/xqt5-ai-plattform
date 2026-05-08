@@ -1,3 +1,5 @@
+import { ChatBubbleIcon, LockIcon } from './Icon'
+
 export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, onDeleteChat }) {
   const sharedChats = chats.filter((c) => c.is_shared)
   const privateChats = chats.filter((c) => !c.is_shared)
@@ -18,7 +20,7 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
           <h4 className="pool-chat-section-title">Shared Chats</h4>
           {sharedChats.map((chat) => (
             <div key={chat.id} className="pool-chat-item" onClick={() => onOpenChat(chat.id)}>
-              <span className="pool-chat-icon">{'\u{1F30D}'}</span>
+              <span className="pool-chat-icon"><ChatBubbleIcon size={15} /></span>
               <div className="pool-chat-info">
                 <span className="pool-chat-name">{chat.title}</span>
                 <span className="pool-chat-meta">{chat.message_count} Nachrichten</span>
@@ -42,7 +44,7 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
           <h4 className="pool-chat-section-title">Meine privaten Chats</h4>
           {privateChats.map((chat) => (
             <div key={chat.id} className="pool-chat-item" onClick={() => onOpenChat(chat.id)}>
-              <span className="pool-chat-icon">{'\u{1F512}'}</span>
+              <span className="pool-chat-icon"><LockIcon size={15} /></span>
               <div className="pool-chat-info">
                 <span className="pool-chat-name">{chat.title}</span>
                 <span className="pool-chat-meta">{chat.message_count} Nachrichten</span>

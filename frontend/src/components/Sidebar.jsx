@@ -146,15 +146,11 @@ export default function Sidebar({
                 isActive ? 'active' : '',
                 item.kind === 'pool' ? 'panel-item--pool' : '',
               ].filter(Boolean).join(' ')
-              const poolStyle = item.kind === 'pool' && item.pool_color
-                ? { borderLeftColor: item.pool_color }
-                : undefined
 
               return (
                 <div
                   key={`${item.kind}:${item.id}`}
                   className={itemClass}
-                  style={poolStyle}
                   onClick={() => onOpenChatItem(item)}
                 >
                   <div className="panel-item-body">
@@ -164,8 +160,6 @@ export default function Sidebar({
                     )}
                     {item.kind === 'pool' && (
                       <span className="panel-item-pool-tag">
-                        <PoolIcon emoji={item.pool_icon} size={11} />
-                        {' '}
                         {t('pool.tag.prefix')}{item.pool_name}
                       </span>
                     )}

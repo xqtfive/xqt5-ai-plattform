@@ -151,6 +151,27 @@ const FILE_TYPE_ICONS = {
   txt: TextFileIcon,
 }
 
+// ── Chat-list icons (used in PoolChatList) ──
+
+/** Speech bubble — denotes a shared / multi-user chat. */
+export function ChatBubbleIcon({ size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+/** Closed padlock — denotes a private chat (only the creator sees it). */
+export function LockIcon({ size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+  )
+}
+
 // ── Public components ──
 
 /**
