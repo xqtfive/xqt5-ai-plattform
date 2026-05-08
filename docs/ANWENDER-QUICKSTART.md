@@ -39,7 +39,7 @@ flowchart LR
 
 Die Oberflaeche hat drei Bereiche:
 - **NavRail** (ganz links): dauerhafte Icon-Leiste fuer Chats, Pools, Assistenten, Templates
-- **Sidebar** (ausklappbar): Konversations- oder Pool-Liste als halbtransparentes Panel
+- **Sidebar** (ausklappbar): Chat-Liste oder Pool-Liste als halbtransparentes Panel. Die Chat-Liste enthaelt **persoenliche Konversationen und Pool-Chats gemischt**, chronologisch sortiert; Pool-Chats sind durch einen farbigen Rahmen + Pool-Tag markiert.
 - **Hauptbereich**: Chat oder Pool-Inhalt
 
 Die Sidebar oeffnet sich per Klick auf ein NavRail-Icon und schliesst sich automatisch, wenn du in den Hauptbereich klickst oder eine Konversation/einen Pool auswaehlen.
@@ -94,6 +94,8 @@ Pools sind geteilte Wissensraeume mit Rollen.
 1. Pools-Icon in der NavRail klicken
 2. Pool auswaehlen oder neuen Pool erstellen
 3. Die Sidebar schliesst sich automatisch — der Pool-Inhalt erscheint im Hauptbereich
+
+Tipp: bestehende Pool-Chats sind auch direkt aus der Hauptchat-Liste erreichbar (Chats-Icon). Sie erscheinen dort gemischt mit persoenlichen Konversationen, mit farbigem Rahmen und Pool-Tag zur Unterscheidung. Klick auf einen Pool-Chat oeffnet ihn direkt im Pool-Kontext, ohne Umweg ueber die Pool-Liste.
 
 ```mermaid
 flowchart TD

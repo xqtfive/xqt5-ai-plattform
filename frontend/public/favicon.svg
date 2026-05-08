@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!--
+    XQT5 favicon — navy "X" + orange "5" subscript.
+    Colors match the brand tokens:
+      navy   = #213452 (var(--color-dark))
+      orange = #ee7f00 (var(--color-primary))
+  -->
+  <text
+    x="3"
+    y="23"
+    font-family="Helvetica, Arial, sans-serif"
+    font-size="24"
+    font-weight="900"
+    fill="#213452"
+  >X</text>
+  <text
+    x="20"
+    y="28"
+    font-family="Helvetica, Arial, sans-serif"
+    font-size="14"
+    font-weight="900"
+    fill="#ee7f00"
+  >5</text>
+</svg>

@@ -365,6 +365,7 @@
    - `PoolShareDialog.jsx` — Invite-Link-Dialog
 7. **App.jsx Änderungen**: Neuer State (pools, activePool, activePoolView, activePoolChat), mutually exclusive mit activeConversation
 8. **Sidebar.jsx**: PoolList-Integration
+9. **Phase 2 (2026-05-07)**: Pool-Chats erscheinen jetzt ZUSÄTZLICH in der Hauptliste der Chats. Backend-Aggregator `pool_chats.py::list_all_pool_chats_for_user` + Endpunkt `GET /api/pools/me/chats`. Frontend `App.jsx` mergt persönliche Konversationen + Pool-Chats per `useMemo`, sortiert nach `created_at` desc. `Sidebar.jsx` rendert Pool-Items mit `panel-item--pool` (farbiger linker Rahmen) + Sub-Zeile mit Pool-Tag. Klick auf Pool-Chat setzt neuen `activePoolChatId`-State und übergibt ihn als `initialChatId`-Prop an `PoolDetail`, das ihn per `useRef`-gateter Effect einmalig konsumiert. Komplette Beschreibung siehe `IMPLEMENTIERT.md` Abschnitt „Pool-Chats in Hauptliste der Chats".
 
 #### Phase E Update (2026-02-21): Pool Text Paste Input
 9. **Neuer Endpoint** (`main.py`):
@@ -572,6 +573,7 @@
    - `transform-origin: top left` (Genspark-Effekt: Aufgehen von oben links)
 2. **`App.jsx`** — Sidebar-Logik:
    - `displayedPool` (Hauptbereich) getrennt von `activePool` (Sidebar-Navigation) — Pool-Inhalt bleibt beim "Alle Pools"-Klick sichtbar
+   - Phase 2 (2026-05-07): zusätzlicher `activePoolChatId`-State für Pool-Chat-Highlighting in der Hauptliste; wird beim Klick auf Pool-Chat in der Merged-Liste gesetzt und als `initialChatId`-Prop an `PoolDetail` durchgereicht
    - `useEffect` mit `document.addEventListener('mousedown', ...)` für Click-Outside-to-Close
    - `handleSelectPool`: `setSidebarOpen(false)` — Sidebar schließt sich bei Pool-Auswahl
    - `onPoolTabChange`, `onCreateConversation`, `onOpenConversation`: alle setzen `setSidebarOpen(false)`

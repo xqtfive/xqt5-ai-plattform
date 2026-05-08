@@ -89,6 +89,7 @@ Pools sind geteilte Dokumentensammlungen, in denen mehrere Nutzer Dokumente able
 5. Share-Link generieren mit Rolle und optionalem Limit (max Uses, Ablaufdatum)
 6. Shared Pool-Chat: Alle Mitglieder sehen denselben Chatverlauf mit RAG-Kontext
 7. Private Pool-Chats: Jeder Nutzer kann eigene private Chats gegen Pool-Dokumente führen
+   - Phase 2 (2026-05-07): alle Pool-Chats des Nutzers (shared + eigene private) erscheinen zusätzlich in der Haupt-Chat-Liste der Sidebar, gemischt mit persönlichen Konversationen, eindeutig durch Pool-Tag markiert
 8. RAG-Suche auf Pool-Scope (nur Dokumente des Pools, nicht des Users)
 9. Source-Attribution in Pool-Chats
 10. Dokumentvorschau im Pool-Dokumenttab (Textvorschau für PDF/TXT, Bildvorschau für Bild-Uploads)
@@ -130,8 +131,8 @@ Pools sind geteilte Dokumentensammlungen, in denen mehrere Nutzer Dokumente able
 7. **Keine Extension nötig**: `tsvector` / GIN / `ts_rank_cd` sind built-in PostgreSQL — Supabase-kompatibel ohne zusätzliche Extensions
 
 ### UX-Verbesserungen
-8. **Sidebar 50:50 Split**: Pools und Conversations teilen sich den Sidebar-Platz 50:50 — beide Sektionen sind gleichzeitig sichtbar und scrollen unabhängig
-9. **Drag-to-Resize Sidebar**: Ziehbarer Divider zwischen Pools und Conversations für individuelle Aufteilung (15-80%)
+8. **Sidebar-Layout (überholt 2026-05-07)**: Sidebar zeigt jetzt EIN Panel je NavRail-Sektion. Das Chats-Panel enthält **persönliche Konversationen und alle Pool-Chats gemischt**, chronologisch nach `created_at` sortiert. Pool-Chats sind durch farbigen linken Rahmen (Pool-Farbe) und Sub-Zeile mit Pool-Tag markiert. Ersetzt das frühere 50:50-Split + Drag-to-Resize-Konzept.
+9. ~~Drag-to-Resize~~ (entfernt mit dem Sidebar-Redesign 2026-03-21; Pool-Chat-Merge 2026-05-07 macht das Konzept vollständig obsolet)
 10. **Upload-Fortschrittsanzeige**: Echtzeit-Fortschrittsbalken beim Hochladen (File-Transfer % + Server-Processing-Shimmer) — Chat und Pool
 
 ### Zitatmodus — Source-Excerpts (umgesetzt 2026-02-22)
@@ -168,7 +169,7 @@ Pools sind geteilte Dokumentensammlungen, in denen mehrere Nutzer Dokumente able
 2. **Scale+Fade-Animation**: Einblenden mit `opacity 0→1` + `scale(0.93→1)` von `transform-origin: top left`, Ausblenden umgekehrt — identisch zum Genspark-UI-Pattern
 3. **Frosted Glass**: `background: rgba(255,255,255,0.18)`, `backdrop-filter: blur(16px) saturate(2)`, Border + Box-Shadow für Tiefenwirkung
 4. **Auto-Close**: Sidebar schließt sich automatisch beim Klick außerhalb (document-level `mousedown`-Handler), beim Öffnen einer Konversation, bei Pool-Auswahl und bei Tab-Wechsel
-5. **displayedPool / activePool**: Zwei getrennte States — `activePool` steuert die Sidebar-Navigation, `displayedPool` den Hauptbereich. Pool-Inhalt bleibt beim Navigieren zu "Alle Pools" sichtbar, verschwindet nur bei explizitem Verlassen
+5. **displayedPool / activePool**: Zwei getrennte States — `activePool` steuert die Sidebar-Navigation, `displayedPool` den Hauptbereich. Pool-Inhalt bleibt beim Navigieren zu "Alle Pools" sichtbar, verschwindet nur bei explizitem Verlassen. Seit Phase 2 (2026-05-07) ergänzt durch `activePoolChatId` — wird beim Klick auf einen Pool-Chat in der Hauptliste gesetzt und als `initialChatId`-Seed an `PoolDetail` übergeben, damit der Chat direkt geöffnet wird
 
 ### Welcome-Screen + Layout
 6. **Logo → Home**: Klick auf XQT5-Logo in der NavRail kehrt zum Welcome-Screen zurück (alle States zurücksetzen)

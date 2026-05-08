@@ -43,14 +43,14 @@ Die Oberfläche besteht aus drei Bereichen:
 | Bereich | Beschreibung |
 |---------|-------------|
 | **NavRail** (ganz links, schmal) | Dauerhafte Navigationsleiste mit Icons für Chats, Pools, Assistenten, Templates und Admin |
-| **Sidebar** (ausklappbar) | Kontextbereich mit Konversations- oder Pool-Liste — erscheint als halbtransparentes Panel über dem Hauptbereich |
+| **Sidebar** (ausklappbar) | Kontextbereich mit Chat-Liste oder Pool-Liste — erscheint als halbtransparentes Panel über dem Hauptbereich |
 | **Hauptbereich** (rechts) | Chat, Pool-Inhalt oder Welcome-Screen |
 
 ### 3.2 Navigation
 
 - **XQT5-Logo** (oben links in der NavRail): Klick kehrt jederzeit zum Welcome-Screen zurück
-- **Chats-Icon**: öffnet die Sidebar mit der Konversationsliste
-- **Pools-Icon**: öffnet die Sidebar mit der Pool-Liste
+- **Chats-Icon**: öffnet die Sidebar mit der Chat-Liste — enthält **persönliche Konversationen und alle Pool-Chats** gemeinsam, chronologisch sortiert. Pool-Chats sind durch einen farbigen linken Rahmen (Pool-Farbe) und eine Sub-Zeile mit Pool-Icon + „Pool: <Name>" markiert. Klick auf einen Pool-Chat-Eintrag öffnet ihn direkt im Pool-Kontext.
+- **Pools-Icon**: öffnet die Sidebar mit der Pool-Liste (für Pool-Verwaltung, Mitglieder, Dokumente)
 - **Assistenten- / Templates-Icon**: öffnet den jeweiligen Manager
 - **Sidebar schließen**: Klick auf den Hauptbereich schließt die Sidebar automatisch; sie schließt sich auch beim Öffnen einer Konversation oder eines Pools
 
@@ -141,6 +141,7 @@ flowchart TD
 - Zwei Chat-Typen:
   - **Shared Chat**: für alle Mitglieder sichtbar
   - **Private Chat**: nur für Ersteller sichtbar, aber gegen Pool-Wissen
+- Alle Pool-Chats erscheinen zusätzlich in der Hauptliste der Chats (Sidebar → Chats-Icon), gemischt mit persönlichen Konversationen und chronologisch sortiert. Sie sind dort durch farbigen linken Rahmen + Pool-Tag eindeutig markiert.
 
 **Dokument-Vorschau im Pool:**
 - In der Dokumentliste erscheint unter dem Dateinamen automatisch eine kurze Zusammenfassung.

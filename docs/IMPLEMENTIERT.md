@@ -279,3 +279,13 @@ Mit Phase 2: persönliche Chats und alle Pool-Chats erscheinen gemeinsam in der 
 - Aggregator inheritiert die N+1-`message_count`-Query aus `list_pool_chats` (Counts werden geholt und dann wieder verworfen). Eine Optimierung wäre eine `list_pool_chats_no_count`-Variante in `pools.py` — bewusst out-of-scope hier um den Touch klein zu halten.
 
 Dateien: `backend/app/pool_chats.py` (neu), `backend/app/main.py`, `frontend/src/api.js`, `frontend/src/App.jsx`, `frontend/src/components/Sidebar.jsx`, `frontend/src/components/PoolDetail.jsx`, `frontend/src/styles.css`, `frontend/src/i18n/strings.js`
+
+---
+
+## Browser-Favicon (2026-05-07)
+
+Bisher kein Favicon — der Browser-Tab zeigte das generische Standard-Icon. Neues SVG-Favicon im XQT5-Branding: navy „X" + orange „5" als Subscript, also „X₅". Verwendet die Brand-Tokens `#213452` (navy) und `#ee7f00` (orange) direkt im SVG (Inline, da Favicons nicht durch CSS-Token aufgelöst werden können).
+
+Datei `frontend/public/favicon.svg` wird von Vite automatisch unter `/favicon.svg` ausgeliefert; Verlinkung in `frontend/index.html` per `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />`. Moderne Browser unterstützen SVG-Favicons direkt; ältere Browser zeigen das Standard-Icon, was akzeptabel ist.
+
+Dateien: `frontend/public/favicon.svg` (neu), `frontend/index.html`
