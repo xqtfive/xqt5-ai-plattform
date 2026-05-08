@@ -63,6 +63,7 @@ from . import admin as admin_crud
 from . import assistants as assistants_crud
 from . import audit
 from . import documents as documents_mod
+from . import pool_chats as pool_chats_mod
 from . import pools as pools_mod
 from . import providers as providers_mod
 from . import rag as rag_mod
@@ -1943,6 +1944,11 @@ async def delete_pool_document(
 
 
 # ── Pool Chats ──
+
+
+@app.get("/api/pools/me/chats", response_model=None)
+async def list_my_pool_chats(current_user: Dict = Depends(get_current_user)):
+    return pool_chats_mod.list_all_pool_chats_for_user(current_user["id"])
 
 
 @app.get("/api/pools/{pool_id}/chats", response_model=None)

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { api } from './api'
 import LoginScreen from './components/LoginScreen'
 import NavRail from './components/NavRail'
@@ -46,6 +46,10 @@ export default function App() {
   const [displayedPool, setDisplayedPool] = useState(null) // controls main content area
   const [poolTab, setPoolTab] = useState('chats')
   const [poolCounts, setPoolCounts] = useState({ docs: 0, chats: 0, members: 0 })
+
+  // Pool chats in main chat list (Phase 2)
+  const [poolChats, setPoolChats] = useState([])
+  const [activePoolChatId, setActivePoolChatId] = useState(null)
 
   // Nav section: 'chat' | 'pools' | 'admin'
   const [activeSection, setActiveSection] = useState('chat')
@@ -152,6 +156,28 @@ export default function App() {
     if (user) loadPools()
   }, [user, loadPools])
 
+  const loadPoolChats = useCallback(async () => {
+    if (!user) { setPoolChats([]); return }
+    try {
+      const data = await api.listMyPoolChats()
+      setPoolChats(data || [])
+    } catch {
+      // silently swallow per existing pattern in loadAssistants etc.
+    }
+  }, [user])
+
+  useEffect(() => {
+    loadPoolChats()
+  }, [loadPoolChats])
+
+  const mergedChatItems = useMemo(() => {
+    const personal = (conversations || []).map(c => ({ kind: 'personal', ...c }))
+    const pool = (poolChats || []).map(c => ({ kind: 'pool', ...c }))
+    return [...personal, ...pool].sort(
+      (a, b) => (b.created_at || '').localeCompare(a.created_at || '')
+    )
+  }, [conversations, poolChats])
+
   // Sync model/temperature when conversation changes
   useEffect(() => {
     if (activeConversation) {
@@ -212,6 +238,8 @@ export default function App() {
     setTemplates([])
     setPools([])
     setActivePool(null)
+    setPoolChats([])
+    setActivePoolChatId(null)
   }
 
   async function onCreateConversation(assistantId = null) {
@@ -268,6 +296,36 @@ export default function App() {
       if (activeConversation?.id === id) {
         setActiveConversation(null)
       }
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  function handleOpenChatItem(item) {
+    if (item.kind === 'personal') {
+      return onOpenConversation(item.id)
+    }
+    // Pool chat: navigate into pool + seed activePoolChatId
+    setActiveSection('pools')
+    const pool = pools.find(p => p.id === item.pool_id)
+    if (pool) {
+      setActivePool(pool)
+      setDisplayedPool(pool)
+    }
+    setPoolTab('chats')
+    setActivePoolChatId(item.id)
+  }
+
+  async function handleDeleteChatItem(item) {
+    // Confirm before either kind of deletion — matches pre-Phase-2 UX where
+    // the confirm lived inside Sidebar for personal chats.
+    if (!confirm(item.kind === 'pool' ? 'Pool-Chat löschen?' : 'Konversation löschen?')) return
+    if (item.kind === 'personal') {
+      return onDeleteConversation(item.id)
+    }
+    try {
+      await api.deletePoolChat(item.pool_id, item.id)
+      await loadPoolChats()
     } catch (e) {
       setError(e.message)
     }
@@ -572,8 +630,10 @@ export default function App() {
         open={sidebarOpen && activeSection !== 'admin'}
         section={activeSection === 'pools' ? 'pools' : 'chat'}
         conversations={conversations}
+        chatItems={mergedChatItems}
         pools={pools}
         activeId={activePool ? null : activeConversation?.id}
+        activePoolChatId={activePoolChatId}
         activePoolId={activePool?.id}
         activePool={activePool}
         poolTab={poolTab}
@@ -584,6 +644,8 @@ export default function App() {
         onCreateConversation={onCreateConversation}
         onOpenConversation={onOpenConversation}
         onDeleteConversation={onDeleteConversation}
+        onOpenChatItem={handleOpenChatItem}
+        onDeleteChatItem={handleDeleteChatItem}
         onSelectPool={handleSelectPool}
         onCreatePool={handleCreatePool}
         onJoinPool={handleJoinPool}
@@ -604,6 +666,7 @@ export default function App() {
           onTabChange={setPoolTab}
           onCountsUpdate={setPoolCounts}
           onError={(msg) => setError(msg)}
+          initialChatId={activePoolChatId}
         />
       ) : (
         <ChatArea

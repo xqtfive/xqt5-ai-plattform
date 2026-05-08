@@ -451,6 +451,19 @@ body {
   flex-shrink: 0;
 }
 
+.panel-item--pool {
+  border-left: 3px solid var(--color-primary);
+}
+
+.panel-item-pool-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-text-light);
+  margin-top: 2px;
+}
+
 /* Leerzustand */
 .panel-empty {
   display: flex;

@@ -47,8 +47,10 @@ export default function Sidebar({
   open,
   section,
   conversations,
+  chatItems,
   pools,
   activeId,
+  activePoolChatId,
   activePoolId,
   activePool,
   poolTab,
@@ -59,6 +61,8 @@ export default function Sidebar({
   onCreateConversation,
   onOpenConversation,
   onDeleteConversation,
+  onOpenChatItem,
+  onDeleteChatItem,
   onSelectPool,
   onCreatePool,
   onJoinPool,
@@ -125,7 +129,7 @@ export default function Sidebar({
         </div>
 
         <div className="panel-list">
-          {conversations.length === 0 ? (
+          {(chatItems || []).length === 0 ? (
             <div className="panel-empty">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}>
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -133,26 +137,47 @@ export default function Sidebar({
               <span>Noch keine Chats</span>
             </div>
           ) : (
-            conversations.map((item) => (
-              <div
-                key={item.id}
-                className={`panel-item${activeId === item.id ? ' active' : ''}`}
-                onClick={() => onOpenConversation(item.id)}
-              >
-                <div className="panel-item-body">
-                  <span className="panel-item-title">{item.title}</span>
-                  <span className="panel-item-sub">{item.message_count} Nachrichten</span>
+            (chatItems || []).map((item) => {
+              const isActive = item.kind === 'personal'
+                ? activeId === item.id
+                : activePoolChatId === item.id
+              const itemClass = [
+                'panel-item',
+                isActive ? 'active' : '',
+                item.kind === 'pool' ? 'panel-item--pool' : '',
+              ].filter(Boolean).join(' ')
+              const poolStyle = item.kind === 'pool' && item.pool_color
+                ? { borderLeftColor: item.pool_color }
+                : undefined
+
+              return (
+                <div
+                  key={`${item.kind}:${item.id}`}
+                  className={itemClass}
+                  style={poolStyle}
+                  onClick={() => onOpenChatItem(item)}
+                >
+                  <div className="panel-item-body">
+                    <span className="panel-item-title">{item.title}</span>
+                    {item.kind === 'personal' && (
+                      <span className="panel-item-sub">{item.message_count} Nachrichten</span>
+                    )}
+                    {item.kind === 'pool' && (
+                      <span className="panel-item-pool-tag">
+                        <PoolIcon emoji={item.pool_icon} size={11} />
+                        {' '}
+                        {t('pool.tag.prefix')}{item.pool_name}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    className="panel-item-delete"
+                    onClick={(e) => { e.stopPropagation(); onDeleteChatItem(item) }}
+                    title="Löschen"
+                  >×</button>
                 </div>
-                <button
-                  className="panel-item-delete"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (confirm('Konversation löschen?')) onDeleteConversation(item.id)
-                  }}
-                  title="Löschen"
-                >×</button>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
 

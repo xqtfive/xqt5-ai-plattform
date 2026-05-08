@@ -245,3 +245,37 @@ Ablösung der bisherigen Emoji-Icons (📚, 📖, 🗂️, 📁, 🚀, ⭐, 💡
 **Vorschau-Datei:** `frontend/dev-tools/icon-preview.html` zeigt alle Icons in 15px/28px/48px nebeneinander mit Emoji-Vergleich. Reines Dev-Tool, wird nicht ausgeliefert.
 
 Dateien: `frontend/src/components/Icon.jsx` (neu), `frontend/src/components/Sidebar.jsx`, `frontend/src/components/PoolList.jsx`, `frontend/src/components/PoolHeader.jsx`, `frontend/src/components/PoolOverview.jsx`, `frontend/src/components/CreatePoolDialog.jsx`, `frontend/src/components/DocumentList.jsx`, `frontend/src/components/PoolDocuments.jsx`, `frontend/dev-tools/icon-preview.html` (neu)
+
+---
+
+## Pool-Chats in Hauptliste der Chats (Phase 2, 2026-05-07)
+
+Bisher waren Pool-Chats nur erreichbar nachdem man explizit in den jeweiligen Pool navigiert und dort den Chats-Tab geöffnet hatte. Persönliche und Pool-Chats waren visuell getrennt in unterschiedlichen Sidebar-Bereichen.
+
+Mit Phase 2: persönliche Chats und alle Pool-Chats erscheinen gemeinsam in der Hauptliste der Chats im Sidebar-Panel, chronologisch nach `created_at` sortiert. Pool-Chats sind durch einen farbigen linken Rahmen (Pool-Farbe) und eine Sub-Zeile mit Pool-Icon + „Pool: <Name>" eindeutig als solche markiert. Klick auf einen Pool-Chat-Eintrag navigiert direkt in den Pool und öffnet den Chat (über einen `initialChatId`-Seed an `PoolDetail`).
+
+**Backend (kein Schema-Eingriff):**
+- Neues Modul `backend/app/pool_chats.py` mit `list_all_pool_chats_for_user(user_id)`, das über `pools_mod.list_pools_for_user` × `pools_mod.list_pool_chats` aggregiert und jeden Chat mit Pool-Metadaten (`pool_id`, `pool_name`, `pool_icon`, `pool_color`, `pool_role`) anreichert. `message_count` wird im Aggregator ausdrücklich nicht mit zurückgegeben — die zugrundeliegende N+1-Count-Query in `list_pool_chats` würde sich pro Pool multiplizieren; die Sidebar-Liste braucht den Count nicht (er bleibt in der Pool-internen Ansicht).
+- Neuer Endpunkt `GET /api/pools/me/chats` in `main.py`, **vor** der parametrischen Route `/api/pools/{pool_id}/chats` registriert, damit FastAPI `me` als Literal-Pfadsegment matched, nicht als Pool-ID.
+- Mitgliedschaft ist implizit erzwungen: nur Pools aus `list_pools_for_user(user_id)` werden iteriert, daher braucht der Aggregator keinen separaten Authz-Check pro Pool.
+- Kein Audit-Log, keine Rate-Limit (folgt Konvention der bestehenden Read-Endpunkte unter `/api/pools/...`).
+
+**Frontend:**
+- `App.jsx`: neue States `poolChats` + `activePoolChatId`. `loadPoolChats` als `useCallback` parallel zu `loadConversations`. `mergedChatItems` via `useMemo` mischt persönliche (`kind: 'personal'`) und Pool-Chats (`kind: 'pool'`), sortiert nach `created_at` desc. Neue Handler `handleOpenChatItem(item)` und `handleDeleteChatItem(item)` verzweigen nach `item.kind`. Wenn ein Pool-Chat geöffnet wird, setzt der Handler synchron `activeSection='pools'`, `activePool`, `displayedPool`, `poolTab='chats'` und `activePoolChatId`, damit `PoolDetail` den Seed-Wert direkt aufnehmen kann.
+- `Sidebar.jsx`: neue Props `chatItems`, `activePoolChatId`, `onOpenChatItem`, `onDeleteChatItem`. List-Keys sind `${kind}:${id}` (vermeidet Kollisionsrisiko). Pool-Items bekommen die CSS-Klasse `panel-item--pool` plus inline `borderLeftColor` aus `pool_color`. Sub-Zeile mit `<PoolIcon>` + `t('pool.tag.prefix')` + `pool_name`.
+- `PoolDetail.jsx`: neuer Prop `initialChatId`. `useRef('consumedChatIdRef')` verhindert Mehrfach-Konsum bei Re-Renders. Effect-Abhängigkeiten `[initialChatId, activeTab]` — feuert nur, wenn der Tab auf `chats` steht und die ID noch nicht konsumiert wurde. Lokales `activeChat`-State bleibt für die In-Pool-Navigation erhalten.
+- `styles.css`: neue Klassen `.panel-item--pool` (linker Rahmen) und `.panel-item-pool-tag` (kleine Schrift in `var(--color-text-light)` mit Inline-Flex für Icon).
+- `i18n/strings.js`: neuer Key `pool.tag.prefix` = „Pool: ". Bestehende `pool.overview.chat.shared` / `.private` werden bei Bedarf wiederverwendet.
+
+**Lösch-Bestätigung:** Der `confirm()`-Dialog vor dem Löschen lebt jetzt in `App.jsx handleDeleteChatItem`, mit unterschiedlichen Texten für persönliche Konversationen und Pool-Chats. Das vereinheitlicht das Pre-Phase-2-Verhalten (das die Bestätigung im Sidebar hatte) für beide Chat-Typen.
+
+**Edge Cases:**
+- Nutzer ist in 0 Pools → Endpunkt liefert `[]`, `mergedChatItems` enthält nur persönliche Chats (keine Regression zur bisherigen UI).
+- Pool wird in einem anderen Tab gelöscht → Click auf den verwaisten Eintrag wirft 403, Handler fängt ab und ruft `loadPoolChats()` zur Bereinigung.
+- Nutzer öffnet denselben Pool-Chat zweimal hintereinander aus der Sidebar → `consumedChatIdRef` verhindert nicht den zweiten Aufruf, weil `setActivePoolChatId` denselben Wert setzt; der Effekt feuert dann nicht erneut. Kein Refetch-Loop.
+
+**Bekannte Einschränkungen für später:**
+- Kein Polling auf den Aggregator — neue Pool-Chats von Kollegen erscheinen erst beim Reload. Für die Phase-2-Iteration akzeptiert.
+- Aggregator inheritiert die N+1-`message_count`-Query aus `list_pool_chats` (Counts werden geholt und dann wieder verworfen). Eine Optimierung wäre eine `list_pool_chats_no_count`-Variante in `pools.py` — bewusst out-of-scope hier um den Touch klein zu halten.
+
+Dateien: `backend/app/pool_chats.py` (neu), `backend/app/main.py`, `frontend/src/api.js`, `frontend/src/App.jsx`, `frontend/src/components/Sidebar.jsx`, `frontend/src/components/PoolDetail.jsx`, `frontend/src/styles.css`, `frontend/src/i18n/strings.js`

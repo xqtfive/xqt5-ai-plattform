@@ -16,6 +16,7 @@ export default function PoolDetail({
   onTabChange,
   onCountsUpdate,
   onError,
+  initialChatId,
 }) {
   const [activeChat, setActiveChat] = useState(null)
   const [chats, setChats] = useState([])
@@ -31,6 +32,16 @@ export default function PoolDetail({
   useEffect(() => {
     if (activeTab !== 'chats') setActiveChat(null)
   }, [activeTab])
+
+  // One-time seed: open a specific chat when navigating from the merged chat list
+  const consumedChatIdRef = useRef(null)
+  useEffect(() => {
+    if (!initialChatId) return
+    if (activeTab !== 'chats') return
+    if (consumedChatIdRef.current === initialChatId) return
+    consumedChatIdRef.current = initialChatId
+    handleOpenChat(initialChatId)
+  }, [initialChatId, activeTab])
 
   // Report counts to parent (for sidebar display)
   useEffect(() => {

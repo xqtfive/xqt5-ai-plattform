@@ -655,6 +655,12 @@ export const api = {
   },
 
   // Pool Chats
+  async listMyPoolChats() {
+    const response = await authFetch(`${API_BASE}/api/pools/me/chats`)
+    if (!response.ok) throw new Error('Konnte Pool-Chats nicht laden')
+    return response.json()
+  },
+
   async listPoolChats(poolId) {
     const response = await authFetch(`${API_BASE}/api/pools/${poolId}/chats`)
     if (!response.ok) throw new Error('Konnte Chats nicht laden')

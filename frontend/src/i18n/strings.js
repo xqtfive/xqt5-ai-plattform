@@ -42,6 +42,7 @@ const STRINGS = {
     'pool.overview.section.documents': 'Dokumente',
     'pool.overview.section.members': 'Mitglieder',
     'pool.overview.section.summary': 'Übersicht',
+    'pool.tag.prefix': 'Pool: ',
     'pool.tab.overview': 'Übersicht',
 
     'doc.status.processing': 'Wird verarbeitet',
