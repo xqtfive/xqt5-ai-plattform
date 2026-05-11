@@ -937,16 +937,17 @@ async def _apply_optional_rerank(
     settings = rerank_settings or {}
     enabled = bool(settings.get("rerank_enabled", False))
     if not enabled or not chunks:
-        # Without reranking, sort chunks by similarity descending so the most
-        # relevant ones from any document come first — naturally interleaves
-        # multi-document results. document_id + chunk_index break ties for
-        # determinism. Earlier behaviour (sort by document_id) caused the
-        # token budget in build_rag_context() to be monopolised by whichever
-        # document had the lowest UUID, dropping later documents silently.
+        # Without reranking, sort chunks by the strongest available score —
+        # RRF beats raw similarity because BM25 hits carry their BM25 score
+        # in the same `similarity` field (mapped at _bm25_search_chunks)
+        # which has a very different scale from vector cosine similarity.
+        # Sorting purely by `similarity` therefore silently undoes the RRF
+        # ranking whenever BM25 contributed. document_id + chunk_index
+        # break ties for determinism.
         return sorted(
             chunks,
             key=lambda c: (
-                -float(c.get("similarity", 0.0)),
+                -float(c.get("rrf_score") or c.get("rerank_score") or c.get("similarity", 0.0) or 0.0),
                 c.get("document_id", ""),
                 c.get("chunk_index", 0),
             ),

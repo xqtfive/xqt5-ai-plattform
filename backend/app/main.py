@@ -76,7 +76,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="XQT5 AI-Workplace API")
 SUPPORTED_UPLOAD_EXTENSIONS = (
     ".pdf", ".txt", ".md",
-    ".csv", ".docx", ".xlsx",
+    ".csv", ".docx", ".xlsx", ".xls",
     ".png", ".jpg", ".jpeg", ".webp",
 )
 MAX_OCR_ASSET_EMBEDDINGS = 40
@@ -97,6 +97,7 @@ _FILE_TYPE_BY_EXT = {
     ".csv": "csv",
     ".docx": "docx",
     ".xlsx": "xlsx",
+    ".xls": "xls",
 }
 
 

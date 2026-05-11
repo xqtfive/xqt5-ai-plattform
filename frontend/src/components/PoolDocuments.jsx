@@ -102,7 +102,7 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.txt,.md,.csv,.docx,.xlsx,.png,.jpg,.jpeg,.webp"
+            accept=".pdf,.txt,.md,.csv,.docx,.xlsx,.xls,.png,.jpg,.jpeg,.webp"
             onChange={handleFileChange}
             style={{ display: 'none' }}
           />

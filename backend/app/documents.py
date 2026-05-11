@@ -73,6 +73,8 @@ async def extract_text(filename: str, file_bytes: bytes) -> str:
         return _extract_docx_text(file_bytes)
     elif lower.endswith(".xlsx"):
         return _extract_xlsx_text(file_bytes)
+    elif lower.endswith(".xls"):
+        return _extract_xls_text(file_bytes)
     elif is_supported_image(lower):
         return await _ocr_image_mistral(file_bytes, filename, guess_image_mime(filename))
     else:
@@ -100,6 +102,8 @@ async def extract_text_and_assets(
         return _extract_docx_text(file_bytes), []
     if lower.endswith(".xlsx"):
         return _extract_xlsx_text(file_bytes), []
+    if lower.endswith(".xls"):
+        return _extract_xls_text(file_bytes), []
     if is_supported_image(lower):
         text = await _ocr_image_mistral(file_bytes, filename, guess_image_mime(filename), user_id=user_id)
         return text, []
@@ -203,6 +207,35 @@ def _extract_xlsx_text(file_bytes: bytes) -> str:
         if md:
             parts.append(md)
     wb.close()
+    return "\n\n".join(parts)
+
+
+def _extract_xls_text(file_bytes: bytes) -> str:
+    """Read a legacy .xls workbook with xlrd<2.0 (newer xlrd dropped xls
+    support). Per-sheet Markdown table output mirrors _extract_xlsx_text so
+    the chunker sees the same shape regardless of source format.
+
+    xlrd returns native types (float, datetime, etc.) — we coerce to str.
+    Trailing all-empty rows are stripped per sheet.
+    """
+    import xlrd
+
+    wb = xlrd.open_workbook(file_contents=file_bytes)
+    parts: List[str] = []
+    for sheet_name in wb.sheet_names():
+        ws = wb.sheet_by_name(sheet_name)
+        rows: List[List[str]] = []
+        for r in range(ws.nrows):
+            cells = ws.row_values(r)
+            rows.append(["" if v in (None, "") else str(v) for v in cells])
+        while rows and all(c == "" for c in rows[-1]):
+            rows.pop()
+        if not rows:
+            continue
+        parts.append(f"## {sheet_name}")
+        md = _rows_to_md_table(rows)
+        if md:
+            parts.append(md)
     return "\n\n".join(parts)
 
 

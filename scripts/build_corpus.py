@@ -5,7 +5,7 @@ Source of truth: docs/tests/phase3/corpus/MUSTERBAU.md (frozen v1.0, 2026-05-08)
 All numbers, names, and IDs are taken verbatim from that document.
 
 Deps:
-    pip install reportlab>=4.0 python-docx>=1.1.0 openpyxl>=3.1.0
+    pip install reportlab>=4.0 python-docx>=1.1.0 openpyxl>=3.1.0 xlwt>=1.3.0
     OR (preferred, using the backend venv):
     uv pip install -e backend[corpus]
 
@@ -1764,12 +1764,80 @@ def build_multidoc_appendix(out_path: Path) -> None:
 
 
 # ===========================================================================
+# Legacy .xls (BIFF8) builder — minimal Bilanz sheet via xlwt
+# ===========================================================================
+
+def build_finanzen_legacy_xls(out_path: Path) -> None:
+    """One-sheet Bilanz_Alt export in the legacy .xls (BIFF8) format.
+
+    Mirrors a subset of finanzen_2025.xlsx so the same Aktiva totals roll
+    through, but uses xlwt (limited styling) and lives in a single sheet —
+    a realistic shape for a legacy-format export from a pre-2007 toolchain.
+    Exercises the .xls extraction path; not styled for human review.
+    """
+    import xlwt
+
+    wb = xlwt.Workbook(encoding="utf-8")
+    ws = wb.add_sheet("Bilanz_Alt")
+
+    header_style = xlwt.easyxf(
+        "font: bold on, colour white; "
+        "pattern: pattern solid, fore_colour dark_blue; "
+        "align: horiz center"
+    )
+    total_style = xlwt.easyxf(
+        "font: bold on, colour white; "
+        "pattern: pattern solid, fore_colour orange",
+        num_format_str='#,##0 "€"',
+    )
+    eur_style = xlwt.easyxf(num_format_str='#,##0 "€"')
+    italic_style = xlwt.easyxf("font: italic on")
+
+    ws.col(0).width = 16000
+    ws.col(1).width = 6000
+
+    ws.write(0, 0, f"{FIRMA} — Bilanz zum 31.12.2025 (Altformat-Export)")
+    ws.write(1, 0, f"HRB: {HRB} | Steuer-ID: {STEUER_ID}", italic_style)
+    ws.write(2, 0, f"Verantwortlich: {CFO} (MA-002); Stichtag-Bewertung im Zuge des CFO-Wechsels E-02 am {CFO_START}.", italic_style)
+
+    rows = [
+        ("Position", "Betrag (€)", header_style, header_style),
+        ("AKTIVA", "", header_style, header_style),
+        ("Anlagevermögen gesamt", ANLAGEVERMOEGEN, None, eur_style),
+        ("  — Sachanlagen", SACHANLAGEN, None, eur_style),
+        ("  — Immaterielle Vermögenswerte", IMMAT_VERMOEGEN, None, eur_style),
+        ("Umlaufvermögen gesamt", UMLAUFVERMOEGEN, None, eur_style),
+        ("  — Vorräte", VORRAETE, None, eur_style),
+        ("  — Forderungen aus L+L", FORDERUNGEN, None, eur_style),
+        ("  — Kassenbestand und Bankguthaben", KASSENBESTAND, None, eur_style),
+        ("Bilanzsumme Aktiva", BILANZ_AKTIVA, total_style, total_style),
+    ]
+    r = 4
+    for left, right, ls, rs in rows:
+        if ls is None:
+            ws.write(r, 0, left)
+        else:
+            ws.write(r, 0, left, ls)
+        if right == "":
+            pass
+        elif rs is None:
+            ws.write(r, 1, right)
+        else:
+            ws.write(r, 1, right, rs)
+        r += 1
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(str(out_path))
+
+
+# ===========================================================================
 # main
 # ===========================================================================
 
 def main() -> None:
     outputs = [
         (CORPUS_ROOT / "musterbau" / "finanzen_2025.xlsx", build_finanzen),
+        (CORPUS_ROOT / "musterbau" / "finanzen_legacy.xls", build_finanzen_legacy_xls),
         (CORPUS_ROOT / "musterbau" / "memo_strategieklausur.docx", build_memo),
         (CORPUS_ROOT / "musterbau" / "geschaeftsbericht_2025.pdf", build_geschaeftsbericht),
         (CORPUS_ROOT / "long" / "handbuch_lang.pdf", build_long_handbook),
@@ -1799,7 +1867,7 @@ def main() -> None:
             print(f"  {f}")
         raise SystemExit(1)
     else:
-        print("Sanity check passed: all 7 files exist and are > 1 KB.")
+        print(f"Sanity check passed: all {len(outputs)} files exist and are > 1 KB.")
 
 
 if __name__ == "__main__":
