@@ -74,7 +74,8 @@ export default function PoolChatArea({
           &larr; Zurück
         </button>
         <span className="pool-chat-title">
-          {chat.is_shared ? <GlobeIcon size={16} /> : <LockIcon size={16} />} {chat.title}
+          {chat.is_shared ? <GlobeIcon size={18} /> : <LockIcon size={18} />}
+          <span className="pool-chat-title-text">{chat.title}</span>
         </span>
       </div>
 

@@ -167,9 +167,10 @@ function ChatBubbleSvg({ size }) {
 
 function LockSvg({ size }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="11" width="16" height="10" rx="2" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
       <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      <circle cx="12" cy="16" r="1.4" fill="currentColor" stroke="none" />
     </svg>
   )
 }
@@ -207,12 +208,14 @@ export function LockIcon({ size = 15, className, style }) {
 }
 
 function GlobeSvg({ size }) {
+  // Meridian/equator endpoints sit 1u inside the circle so their round
+  // line caps don't visually pierce the circle stroke at small sizes.
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="9" />
-      <ellipse cx="12" cy="12" rx="9" ry="4" />
-      <path d="M 12 3 Q 6 12 12 21" />
-      <path d="M 12 3 Q 18 12 12 21" />
+      <ellipse cx="12" cy="12" rx="8" ry="3.5" />
+      <path d="M 12 4 Q 6.5 12 12 20" />
+      <path d="M 12 4 Q 17.5 12 12 20" />
     </svg>
   )
 }

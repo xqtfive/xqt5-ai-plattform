@@ -3026,12 +3026,20 @@ body {
 
 .pool-chat-title {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 14px;
   font-weight: 600;
   color: var(--color-dark);
+  min-width: 0;
+}
+
+.pool-chat-title-text {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .pool-messages {
