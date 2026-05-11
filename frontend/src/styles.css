@@ -2120,6 +2120,89 @@ body {
   white-space: nowrap;
 }
 
+/* Multi-file batch list (FileUpload.jsx) */
+.file-upload-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.file-upload-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: var(--color-bg-secondary, #f5f5f7);
+  border-left: 2px solid transparent;
+}
+
+.file-upload-item--pending { border-left-color: var(--color-border); }
+.file-upload-item--uploading { border-left-color: var(--color-primary); }
+.file-upload-item--done { border-left-color: #4caf50; }
+.file-upload-item--error { border-left-color: #d32f2f; background: rgba(211, 47, 47, 0.06); }
+
+.file-upload-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-upload-status {
+  font-size: 10px;
+  color: var(--color-text-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.file-upload-item--error .file-upload-status {
+  color: #d32f2f;
+}
+
+.file-upload-list-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 0 0;
+}
+
+.file-upload-list-clear {
+  font-size: 10px;
+  background: none;
+  border: none;
+  color: var(--color-text-light);
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+/* Multi-file batch list (PoolDocuments.jsx) */
+.pool-upload-batch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.pool-upload-batch-item--pending { opacity: 0.7; }
+.pool-upload-batch-item--done { border-left: 3px solid #4caf50; opacity: 0.8; }
+.pool-upload-batch-item--error {
+  border-left: 3px solid #d32f2f;
+  background: rgba(211, 47, 47, 0.04);
+}
+
+.pool-upload-batch-clear {
+  align-self: flex-end;
+  margin-top: 2px;
+}
+
 /* Pool upload pending card */
 .pool-doc-uploading {
   border: 1px dashed var(--color-border) !important;

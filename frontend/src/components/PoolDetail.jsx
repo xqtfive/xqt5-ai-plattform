@@ -91,14 +91,13 @@ export default function PoolDetail({
     }
   }, [loadDocuments, loadChats, loadMembers])
 
+  // Errors are intentionally NOT caught here — they propagate to
+  // PoolDocuments' per-file state list. See App.jsx handleUploadDocument
+  // for the same rationale (single-error-blob would erase prior failures
+  // in a multi-file batch).
   async function handleUploadDocument(file, onProgress) {
-    setError('')
-    try {
-      await api.uploadPoolDocument(pool.id, file, onProgress)
-      await loadDocuments()
-    } catch (e) {
-      setError(e.message)
-    }
+    await api.uploadPoolDocument(pool.id, file, onProgress)
+    await loadDocuments()
   }
 
   async function handleUploadText(title, content) {

@@ -281,3 +281,18 @@ Dieses Dokument hält Coding-Entscheidungen und Fehlerjournal fest, damit Fehler
 11. **SSE-Daten sind flüchtig**: Alle Daten, die nach Navigation/Reload sichtbar bleiben sollen (Quellen, Zitate, Metadaten), müssen in der DB gespeichert werden — nicht nur im Stream-Event.
 12. **Pydantic-Request-Models vollständig halten**: Bei neuen Settings-Feldern sofort auch das zugehörige Request-Model aktualisieren. Fehlende Felder werden still ignoriert, kein Validierungsfehler tritt auf.
 13. **Logging immer initialisieren**: `logging.basicConfig(level=logging.INFO)` am Anfang von `main.py` — ohne das sind alle `logger.info()`-Aufrufe im gesamten Projekt unsichtbar.
+
+### 2026-05-11 — Build-System: uv + uv.lock (Coolify)
+
+- **Fehler: Hartkodierte `pip install`-Liste im `backend/Dockerfile` ignorierte `pyproject.toml`.**
+  Ursache: Der vorherige Dockerfile listete Pakete inline auf (`pip install fastapi uvicorn ...`). Neue Deps die in `pyproject.toml` ergänzt wurden (z. B. `python-docx`, `openpyxl`, `xlrd`) wurden bei jedem Coolify-Build still verworfen. Nach dem Deploy meldete der Upload-Pfad `ModuleNotFoundError: No module named 'openpyxl'` obwohl die Dep deklariert war.
+  Korrektur: Dockerfile auf `uv sync --frozen --no-dev --no-install-project` umgestellt. **Regel: Runtime-Deps sind in `backend/uv.lock` festgepinnt — Lockfile gewinnt gegenüber `pyproject.toml`-Bereichen. Neue Deps werden in `pyproject.toml` ergänzt UND danach mit `uv lock` in `uv.lock` überführt; beide Dateien wandern im selben Commit.**
+
+- **Design-Entscheidung: `pyproject.toml`-Versionsobergrenzen als Defense-in-Depth.**
+  `fastapi<1.0`, `pydantic<3.0`, `supabase<3.0`, `bcrypt==4.0.1` (exakt) verhindern dass eine spätere `uv lock`-Regeneration versehentlich einen Breaking-Major einzieht. `uv.lock` pinnt die exakten Versionen heute; die Obergrenzen schützen den Zustand sechs Monate später, wenn jemand "mal eben" das Lockfile aktualisiert.
+
+- **Design-Entscheidung: `--no-install-project` im Dockerfile.**
+  Die Runtime importiert `app.main:app` aus dem Filesystem-Pfad `/app/app`, nicht aus einem pip-installierten Package. `uv sync` installiert deshalb nur Drittabhängigkeiten ins `/app/.venv`, nicht das Projekt selbst. `PATH` ist auf `/app/.venv/bin` vorangestellt damit `uvicorn` aus dem venv resolved wird. **Regel: Wenn die App-Quelle per `COPY` reinkommt und nicht über einen Wheel-Install läuft, immer `--no-install-project` setzen — sonst doppelte Installation und Konfusion über welche Version aktiv ist.**
+
+- **Optionale Deps-Gruppe `[corpus]`.**
+  `reportlab` und `xlwt` werden ausschließlich zur Generierung der Test-Fixtures unter `docs/tests/phase3/corpus/` gebraucht (siehe `scripts/build_corpus.py`). Sie landen nicht im Production-Image — `uv sync --no-dev --no-install-project` installiert sie nicht. Wer lokal Fixtures regenerieren will: `uv pip install -e backend[corpus]`.

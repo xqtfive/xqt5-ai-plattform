@@ -72,8 +72,11 @@ async function tryRefresh() {
 }
 
 // XHR-based upload for progress tracking.
-// onProgress(pct): 0-100 = file transfer %, -1 = server processing (file sent, waiting for response)
-function uploadWithXhr(url, formData, onProgress) {
+// onProgress(pct): 0-100 = file transfer %, -1 = server processing (file sent, waiting for response).
+// On 401 (token expired), refreshes once via tryRefresh() and retries the upload exactly once.
+// Without this retry, long batches (e.g. multi-file uploads with slow OCR) silently die on
+// the first file whose response arrives after the access token has expired.
+function uploadWithXhr(url, formData, onProgress, _isRetry = false) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', url)
@@ -87,7 +90,20 @@ function uploadWithXhr(url, formData, onProgress) {
       xhr.upload.addEventListener('load', () => onProgress(-1))
     }
 
-    xhr.onload = () => {
+    xhr.onload = async () => {
+      if (xhr.status === 401 && !_isRetry) {
+        const refreshed = await tryRefresh()
+        if (refreshed) {
+          try {
+            const retryData = await uploadWithXhr(url, formData, onProgress, true)
+            resolve(retryData)
+          } catch (err) {
+            reject(err)
+          }
+          return
+        }
+        // refresh failed — fall through to the error path below
+      }
       if (xhr.status >= 200 && xhr.status < 300) {
         try { resolve(JSON.parse(xhr.responseText)) } catch { resolve(xhr.responseText) }
       } else {

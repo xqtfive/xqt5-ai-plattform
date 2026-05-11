@@ -3,11 +3,17 @@ import { api } from '../api'
 import { t } from '../i18n/strings'
 import { FileTypeIcon } from './Icon'
 
+// Same concurrency rules as FileUpload.jsx — see comments there.
+const MAX_CONCURRENT = 2
+const RATE_LIMIT_WARN_THRESHOLD = 20
+
 export default function PoolDocuments({ poolId, documents, canEdit, onUpload, onUploadText, onDelete }) {
   const fileInputRef = useRef(null)
-  const [uploading, setUploading] = useState(false)
-  // null = idle, { name, pct } = upload in progress (pct: 0-100 or -1 for server processing)
-  const [uploadingFile, setUploadingFile] = useState(null)
+  // Per-file upload state for the current/most-recent batch. Each entry:
+  //   { file, name, status: 'pending'|'uploading'|'done'|'error', pct: 0-100|-1, error: string|null }
+  // Persists across the batch so the user can see what failed and what
+  // landed; cleared explicitly via "Liste leeren" or on next selection.
+  const [uploads, setUploads] = useState([])
   const [textSaving, setTextSaving] = useState(false)
   const [showTextModal, setShowTextModal] = useState(false)
   const [textTitle, setTextTitle] = useState('')
@@ -17,20 +23,65 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
   const [previewError, setPreviewError] = useState('')
   const [previewDoc, setPreviewDoc] = useState(null)
 
+  const busyUploading = uploads.some((u) => u.status === 'pending' || u.status === 'uploading')
+
   async function handleFileChange(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    setUploadingFile({ name: file.name, pct: 0 })
-    try {
-      await onUpload(file, (pct) => setUploadingFile({ name: file.name, pct }))
-    } catch {
-      // Error handled by parent
-    } finally {
-      setUploading(false)
-      setUploadingFile(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+    const selected = Array.from(e.target.files || [])
+    if (!selected.length) return
+
+    if (selected.length > RATE_LIMIT_WARN_THRESHOLD) {
+      const ok = window.confirm(
+        `Du hast ${selected.length} Dateien ausgewählt. Es sind nur ${RATE_LIMIT_WARN_THRESHOLD} Uploads pro Minute erlaubt — Dateien dahinter erhalten eine Rate-Limit-Fehlermeldung. Trotzdem fortfahren?`
+      )
+      if (!ok) {
+        if (fileInputRef.current) fileInputRef.current.value = ''
+        return
+      }
     }
+
+    const initial = selected.map((f) => ({
+      file: f,
+      name: f.name,
+      status: 'pending',
+      pct: 0,
+      error: null,
+    }))
+    setUploads(initial)
+
+    const patchAt = (idx, patch) => {
+      setUploads((prev) => prev.map((u, i) => (i === idx ? { ...u, ...patch } : u)))
+    }
+
+    async function processOne(idx) {
+      patchAt(idx, { status: 'uploading', pct: 0 })
+      try {
+        await onUpload(initial[idx].file, (pct) => patchAt(idx, { pct }))
+        patchAt(idx, { status: 'done', pct: 100 })
+      } catch (err) {
+        patchAt(idx, { status: 'error', error: err?.message || 'Fehler' })
+      }
+    }
+
+    // Worker-pool semaphore: MAX_CONCURRENT workers pull the next available
+    // index until the queue drains. NOT shared with the text-paste flow —
+    // that stays atomic.
+    let nextIdx = 0
+    async function worker() {
+      while (nextIdx < initial.length) {
+        const myIdx = nextIdx
+        nextIdx += 1
+        await processOne(myIdx)
+      }
+    }
+    await Promise.all(
+      Array.from({ length: Math.min(MAX_CONCURRENT, initial.length) }, () => worker())
+    )
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function clearUploadList() {
+    setUploads((prev) => prev.filter((u) => u.status === 'pending' || u.status === 'uploading'))
   }
 
   async function handleOpenPreview(doc) {
@@ -74,6 +125,8 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
     setShowTextModal(false)
   }
 
+  // Text paste is intentionally NOT batchable — one title, one content blob.
+  // Do not refactor handleSaveText to share state with handleFileChange.
   async function handleSaveText() {
     if (!onUploadText || textSaving) return
     const content = textContent.trim()
@@ -102,6 +155,7 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
           <input
             ref={fileInputRef}
             type="file"
+            multiple
             accept=".pdf,.txt,.md,.csv,.docx,.xlsx,.xls,.png,.jpg,.jpeg,.webp"
             onChange={handleFileChange}
             style={{ display: 'none' }}
@@ -109,45 +163,69 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
           <button
             className="btn btn-primary"
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploading || textSaving}
+            disabled={busyUploading || textSaving}
           >
-            {uploading ? 'Lade hoch...' : 'Dokument hochladen'}
+            {busyUploading ? 'Lade hoch...' : 'Dokumente hochladen'}
           </button>
           <button
             className="btn btn-secondary"
             onClick={openTextModal}
-            disabled={uploading || textSaving}
+            disabled={busyUploading || textSaving}
           >
             Text einfügen
           </button>
-          <span className="pool-upload-hint">PDF, TXT oder Bild</span>
+          <span className="pool-upload-hint">PDF, Office, CSV, Markdown, TXT, Bild — mehrere zugleich</span>
         </div>
       )}
 
-      {documents.length === 0 && !uploadingFile ? (
+      {uploads.length > 0 && (
+        <div className="pool-upload-batch">
+          {uploads.map((u, i) => (
+            <div
+              key={i}
+              className={`pool-doc-item pool-doc-uploading pool-upload-batch-item--${u.status}`}
+              title={u.error || ''}
+            >
+              <span className="pool-doc-icon">📄</span>
+              <div className="pool-doc-info">
+                <span className="pool-doc-name">{u.name}</span>
+                {u.status === 'uploading' && (
+                  <div className="pool-upload-progress">
+                    <div
+                      className={`pool-upload-bar ${u.pct === -1 ? 'pool-upload-bar--processing' : ''}`}
+                      style={u.pct >= 0 ? { width: `${u.pct}%` } : undefined}
+                    />
+                  </div>
+                )}
+                <span className="pool-doc-meta pool-upload-status">
+                  {u.status === 'pending' && 'Warten in der Warteschlange...'}
+                  {u.status === 'uploading' &&
+                    (u.pct === -1 ? 'OCR & Verarbeitung...' : `Hochladen ${u.pct}%`)}
+                  {u.status === 'done' && 'OK — fertig hochgeladen'}
+                  {u.status === 'error' && (u.error || 'Fehler')}
+                </span>
+              </div>
+            </div>
+          ))}
+          {!busyUploading && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-small pool-upload-batch-clear"
+              onClick={clearUploadList}
+            >
+              Liste leeren
+            </button>
+          )}
+        </div>
+      )}
+
+      {documents.length === 0 && uploads.length === 0 ? (
         <div className="pool-empty-state">
           Noch keine Dokumente vorhanden.
           {canEdit && ' Lade ein Dokument hoch, um loszulegen.'}
         </div>
       ) : (
         <div className="pool-document-list">
-          {uploadingFile && (
-            <div className="pool-doc-item pool-doc-uploading">
-              <span className="pool-doc-icon">📄</span>
-              <div className="pool-doc-info">
-                <span className="pool-doc-name">{uploadingFile.name}</span>
-                <div className="pool-upload-progress">
-                  <div
-                    className={`pool-upload-bar ${uploadingFile.pct === -1 ? 'pool-upload-bar--processing' : ''}`}
-                    style={uploadingFile.pct >= 0 ? { width: `${uploadingFile.pct}%` } : undefined}
-                  />
-                </div>
-                <span className="pool-doc-meta pool-upload-status">
-                  {uploadingFile.pct === -1 ? 'OCR & Verarbeitung...' : `Hochladen ${uploadingFile.pct}%`}
-                </span>
-              </div>
-            </div>
-          )}
           {documents.map((doc) => (
             <div key={doc.id} className={`pool-doc-item doc-status-${doc.status}`}>
               <FileTypeIcon type={doc.file_type} size={20} className="pool-doc-icon" />
@@ -166,7 +244,7 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
                   {doc.status === 'ready' && `${doc.chunk_count} Chunks`}
                   {doc.status === 'processing' && t('doc.status.processing.long')}
                   {doc.status === 'error' && (doc.error_message || 'Fehler')}
-                  {' \u00B7 '}
+                  {' · '}
                   {(doc.file_size_bytes / 1024).toFixed(0)} KB
                 </span>
               </div>

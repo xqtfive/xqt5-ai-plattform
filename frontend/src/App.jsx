@@ -489,14 +489,14 @@ export default function App() {
   }
 
   // Document handlers
+  //
+  // Errors are intentionally NOT caught here — they propagate to FileUpload's
+  // per-file state list so a failed file (or rate-limited file) shows its
+  // own status row instead of getting collapsed into a single top-level
+  // setError() blob that the next file overwrites.
   async function handleUploadDocument(file, chatId, onProgress) {
-    setError('')
-    try {
-      await api.uploadDocument(file, chatId, onProgress)
-      await loadDocuments()
-    } catch (e) {
-      setError(e.message)
-    }
+    await api.uploadDocument(file, chatId, onProgress)
+    await loadDocuments()
   }
 
   async function handleDeleteDocument(docId) {
