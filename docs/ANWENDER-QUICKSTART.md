@@ -121,7 +121,8 @@ Tipps:
 
 - **Sidebar verschwunden**: Klick auf das entsprechende Icon in der NavRail (links) oeffnet sie erneut.
 - **Kein Modell sichtbar**: Admin muss Modell/Provider aktivieren.
-- **Dokumentverarbeitung schlaegt fehl**: Dateityp pruefen (`PDF/TXT/Bild`), Datei ggf. kleiner machen.
+- **Dokumentverarbeitung schlaegt fehl**: Dateityp pruefen (`PDF`, `TXT`, `MD`, `CSV`, `DOCX`, `XLSX`, `XLS`, `PNG`/`JPG`/`JPEG`/`WEBP`), Datei ggf. kleiner machen.
+- **Rate-Limit beim Mehrfach-Upload**: max. 20 Dateien pro Minute pro Nutzer; einzelne Dateien beim Batch-Upload zeigen ggf. „HTTP 429" im Status — danach kurz warten und erneut hochladen.
 - **Keine Quellen bei Antwort**: pruefen, ob Dokumentstatus "ready" ist.
 - **Keine/zu kurze Vorschau**: Vorschau zeigt Textauszug; bei sehr langen Dokumenten ist sie gekuerzt.
 - **Login/Session bricht ab**: ggf. neu einloggen (Token wurde evtl. invalidiert).

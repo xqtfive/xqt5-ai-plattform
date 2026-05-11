@@ -289,3 +289,171 @@ Bisher kein Favicon — der Browser-Tab zeigte das generische Standard-Icon. Neu
 Datei `frontend/public/favicon.svg` wird von Vite automatisch unter `/favicon.svg` ausgeliefert; Verlinkung in `frontend/index.html` per `<link rel="icon" type="image/svg+xml" href="/favicon.svg" />`. Moderne Browser unterstützen SVG-Favicons direkt; ältere Browser zeigen das Standard-Icon, was akzeptabel ist.
 
 Dateien: `frontend/public/favicon.svg` (neu), `frontend/index.html`
+
+---
+
+## Phase 3.0 — Observability-Log in `build_rag_context()` (2026-05-08)
+
+Temporäres Logging zur Verifikation der Multi-Dok-Bias- und RRF-Sortier-Fixes. Nach jedem erfolgreich gepackten Chunk schreibt `build_rag_context()` einen `phase3=true`-Eintrag mit `{id, doc, idx, sim, rrf, rerank, tok, neighbor}` für jeden Chunk, der ins Token-Budget gepasst hat. Dadurch ist post-hoc nachweisbar, ob die Sortierung tatsächlich Chunks aus mehreren Dokumenten ins Budget bringt und welcher Score (vektor-similarity, RRF, oder Cohere-Rerank) die Reihenfolge bestimmt hat.
+
+Geplante Entfernung: nach Abschluss der Phase-3.1-Verifikationsmatrix. Das Log ist explizit mit dem Marker `phase3=true` getaggt, damit ein simpler Grep den Entfernungspunkt findet.
+
+Dateien: `backend/app/rag.py` (Zeilen 1354–1378)
+
+---
+
+## Phase 3.5 — Filetype-Erweiterung csv/docx/md/xlsx (2026-05-08)
+
+Der Upload-Pfad unterstützte bisher nur PDF (via Mistral OCR), TXT und Bilder. Erweitert auf vier weitere Formate, alle als reine Datei-Lese-Pfade ohne OCR-Roundtrip:
+
+- **`.csv`** — stdlib `csv` mit Sniffer für den Delimiter (komma/semikolon/tab/pipe); Output ist eine Markdown-Tabelle damit der Chunker die Tabellenstruktur sieht.
+- **`.md`** — UTF-8-Decode (identisch zu `.txt`); existierende Heading-Hierarchie wird vom Chunker via `extract_section_path()` automatisch genutzt.
+- **`.docx`** — `python-docx`, walkt `doc.iter_inner_content()` in Dokumentenreihenfolge. Heading-Style-Paragraphen werden zu Markdown-Headings (`Heading 1` → `#`, `Title` → `#`); Tabellen werden über das `_rows_to_md_table`-Helper als Markdown-Pipe-Tabellen serialisiert.
+- **`.xlsx`** — `openpyxl` im read-only/data-only-Modus. Pro Sheet wird ein `## SheetName`-Heading plus eine Markdown-Tabelle emittiert; trailing-empty-rows werden gestrippt.
+
+Wiring:
+- `backend/app/main.py:77-81` — `SUPPORTED_UPLOAD_EXTENSIONS` um `.md`, `.csv`, `.docx`, `.xlsx` erweitert.
+- `backend/app/main.py:93-101` — neue `_FILE_TYPE_BY_EXT`-Map ersetzt die alte `if/elif`-Kaskade in `_resolve_file_type()`; treibt das `file_type`-Label in der Datenbank und damit die FileTypeIcon-Auswahl im Frontend.
+- `backend/pyproject.toml` — neue Deps `python-docx>=1.1.0` und `openpyxl>=3.1.0`.
+- Frontend `accept`-Attribute in `FileUpload.jsx` und `PoolDocuments.jsx` synchron erweitert.
+
+Keine Asset-Extraktion aus Office-Formaten in diesem Schritt — `_extract_*_text`-Funktionen geben `[]` für `assets`. Bild-Extraktion aus DOCX/PPTX-Formaten kommt mit OCR-Pipeline v2 (Docling, Roadmap-Priorität #6).
+
+Dateien: `backend/app/documents.py`, `backend/app/main.py`, `backend/pyproject.toml`, `frontend/src/components/FileUpload.jsx`, `frontend/src/components/PoolDocuments.jsx`
+
+---
+
+## Phase 3.5 — Musterbau-Testkorpus + Build-Skript (2026-05-08)
+
+Aufbau eines reproduzierbaren Test-Korpus für die Phase-3.1-Verifikationsmatrix unter `docs/tests/phase3/corpus/`. Source-of-Truth ist `MUSTERBAU.md` (374 Zeilen) mit gefrorenen Werten für eine fiktive Musterbau GmbH (Dortmund, NRW, 127 FTE, 18,45 M € Umsatz 2025, 30 Mitarbeitende, 50 Kunden, 5 PIMS-Produktlinien, 8 Schlüsselereignisse 2025, 10 BM25-Begriffe mit exklusiver Datei-Zuweisung).
+
+Fixture-Verzeichnis `corpus/musterbau/` mit den aktiven Dateitypen: `geschaeftsbericht_2025.pdf` (12 KB, 7 Seiten, Logo auf jeder Seite identisch für pHash-Test), `finanzen_2025.xlsx` (8 KB, 3 Sheets Bilanz/GuV/Kapitalflussrechnung — Aktiva = Passiva = 9 050 000 €), `memo_strategieklausur.docx` (38 KB), `kunden.csv` (51 Zeilen), `techspec_pims.md` (230 Zeilen), `protokoll_qmeeting.txt` (172 Zeilen), plus `finanzen_legacy.xls` (5,6 KB, 2026-05-11 nachgereicht).
+
+Plus Subset-Ordner für spezifische Tests: `multidoc_a/` (Test A — Multi-Dok-Bias), `long/handbuch_lang.pdf` (50 Seiten, Test B — Token-Budget-Overflow), `dedup/sample.pdf` (Test C), `phash/logo_repeating.pdf` (Test D), `rrf/` (Test F — 1 BM25-starker Anker + 4 Vektor-ähnliche Decoys).
+
+Build-Skript `scripts/build_corpus.py` regeneriert alle Binär-Fixtures (xlsx via openpyxl, docx via python-docx, pdf via reportlab, xls via xlwt). Optionale Deps-Gruppe `corpus = ["reportlab>=4.0", "xlwt>=1.3.0"]` in `pyproject.toml`; Aufruf via `uv pip install -e backend[corpus] && python scripts/build_corpus.py`. Text-Fixtures (md/txt/csv) sind handgeschrieben und werden vom Skript nicht überschrieben. Sanity-Check am Ende von `main()` validiert dass jedes Output existiert und > 1 KB ist.
+
+Dateien: `docs/tests/phase3/corpus/MUSTERBAU.md` (neu), `docs/tests/phase3/corpus/musterbau/*`, `docs/tests/phase3/corpus/{multidoc_a,long,dedup,phash,rrf}/*`, `scripts/build_corpus.py` (neu)
+
+---
+
+## Globe-/Lock-Icon-System + Pool-Übersicht-Rework + Chat-Navigation-Fix (2026-05-08 bis 2026-05-11)
+
+Drei zusammenhängende UI-Iterationen am Pool-Flow.
+
+**Globe + Lock als Line-Art-Icons (toggle-aware).** Frühere Versionen nutzten die bunten Emojis `🌍` (shared chat) und `🔒` (privater chat) — sowohl in `PoolChatList.jsx` als auch im Header von `PoolChatArea.jsx`. Migriert auf `<GlobeIcon>` / `<LockIcon>` in `Icon.jsx`, beide nach dem gleichen Muster wie die bestehenden `LINE_ICONS_ENABLED`-Toggle-Komponenten — bei `false` rendern sie die Emojis als Fallback, bei `true` (default) die Line-Art-SVGs. Mehrere Design-Iterationen (User wählte aus 20+20 Vorschlägen für die finale Form von Globe + Lock).
+
+**Pool-Übersicht Summary-Karte vereinfacht.** Die Summary-Sektion in `PoolOverview.jsx` zeigte bisher `<PoolIcon size={32}>` + Name + Beschreibung + `<RoleBadge>` („Eigentümer:in"). Neu: nur noch `Name: "{pool.name}"` plus eine Zeile mit Zählern `{N} Dokumente · {M} Chats · {K} Mitglieder` plus optionale Beschreibung. PoolIcon und RoleBadge gestrichen — das große Icon bleibt nur noch in `PoolHeader.jsx` (Bar darüber). Vier neue i18n-Keys: `pool.overview.summary.{name_label, docs, chats_count, members_count}`.
+
+**Chat-Navigation aus der Übersicht repariert.** Klick auf einen Chat-Eintrag in der Übersicht hat das Chat-Fenster nicht geöffnet — `handleOpenChat()` in `PoolDetail.jsx` setzte zwar `activeChat`, ließ aber `activeTab` auf `'overview'`. Die Render-Bedingung in `PoolDetail.jsx:227` ist `activeTab === 'chats' && activeChat` — also blieb die Übersicht sichtbar. Fix: `onTabChange('chats')` vor der async-Chat-Fetch in `handleOpenChat`, damit Tab und Chat synchron umgeschaltet werden.
+
+Dateien: `frontend/src/components/Icon.jsx`, `frontend/src/components/PoolChatList.jsx`, `frontend/src/components/PoolChatArea.jsx`, `frontend/src/components/PoolOverview.jsx`, `frontend/src/components/PoolDetail.jsx`, `frontend/src/i18n/strings.js`, `frontend/src/styles.css`
+
+---
+
+## Favicon-Iteration: typographic redesign + Firefox-Fix (2026-05-08 bis 2026-05-11)
+
+Drei Iterationen am Favicon nach dem initialen Wurf vom 2026-05-07:
+
+1. **Stroke-Verdickung** (2026-05-08) — X-Stroke 4.6 → 5.5, „5"-Path-Stroke 2.3 → 3.0 für bessere Lesbarkeit bei 16×16. Plus 32×32- und 16×16-PNG-Fallbacks über Pillow gerendert, eingebunden in `index.html` mit `?v=2`-Cache-Bust.
+2. **`.ico`-Fallback** (2026-05-10) — Firefox triggert beim Tab-Wechsel teils eine implizite `/favicon.ico`-Anfrage, die ohne tatsächliche `.ico`-Datei 404 lieferte und auf das Browser-Default-Globe-Icon zurückfiel. Neue Datei `frontend/public/favicon.ico` + `<link rel="icon" href="/favicon.ico" sizes="any">` in `index.html` (Priorität vor den PNGs/SVG).
+3. **Typografische Neugestaltung** (2026-05-10/11) — `favicon.svg` komplett gestrichen, durch hochauflösendere `.ico` + PNGs ersetzt. User wählte das finale Design aus 20 Vorschlägen. Cache-Bust auf `?v=5`.
+
+Dateien: `frontend/public/favicon.ico` (neu), `frontend/public/favicon-32.png`, `frontend/public/favicon-16.png`, `frontend/index.html` — `frontend/public/favicon.svg` entfernt.
+
+---
+
+## RRF-Sortier-Bug behoben (Finding 2, 2026-05-11)
+
+Während der Phase-3-Code-Audit fiel auf: der Multi-Dok-Bias-Fix vom 2026-05-07 (Sortierung nach `(-similarity, document_id, chunk_index)` in `_apply_optional_rerank()`) wird im hybriden Retrieval-Pfad (Vektor + BM25 → RRF) **stillschweigend unterminiert**, sobald die No-Rerank-Branch genommen wird.
+
+**Mechanismus:** `_bm25_search_chunks()` in `rag.py:751` mappt den BM25-Score (0–~5,0-Skala) in das `similarity`-Feld — derselbe Slot, in dem Vektorhits ihre Cosine-Similarity (0–1-Skala) tragen. `_reciprocal_rank_fusion()` merged beide Listen korrekt nach RRF und schreibt jedem überlebenden Chunk einen sauberen `rrf_score`. `_apply_optional_rerank()` sortiert dann aber wieder nach `similarity` — was die RRF-Reihenfolge zerschießt, sobald BM25-Hits beitragen, da deren `similarity`-Werte (BM25-Skala) signifikant kleiner sind als Vektor-Cosine-Werte.
+
+**Fix:** Sortier-Key in `_apply_optional_rerank()` (rag.py:949–953) ändert von `-float(c.get("similarity", 0.0))` auf `-float(c.get("rrf_score") or c.get("rerank_score") or c.get("similarity", 0.0) or 0.0)`. RRF gewinnt wenn vorhanden, sonst Cohere-Rerank-Score (falls anwesend), sonst Fallback auf Similarity. Tiebreaker (document_id, chunk_index) bleibt unverändert.
+
+**Lasttragend** weil kein Cohere-API-Key konfiguriert ist (Decision 2026-05-11: no-rerank ist akzeptierte aktuelle Design). Ohne Rerank-Stage ist diese Sortierung der einzige Re-Ordering-Mechanismus nach der Hybrid-Retrieval-Fusion. Vor dem Fix wurde RRF im Default-Pfad praktisch jedes Mal eingeebnet.
+
+Dateien: `backend/app/rag.py` (Zeilen 940–955)
+
+---
+
+## Dockerfile-Umbau auf `uv sync --frozen` + `pyproject.toml`-Härtung (2026-05-11)
+
+**Anlass:** Beim Test von DOCX- und XLSX-Upload nach dem 2026-05-08-Deploy lieferte das Backend `ModuleNotFoundError: No module named 'openpyxl'` bzw. `'docx'` — obwohl beide Deps seit 2026-05-08 in `backend/pyproject.toml` standen. Befund: der bisherige `backend/Dockerfile` hatte eine hardcoded `pip install`-Liste, die `pyproject.toml` ignorierte. Jede seit Initial-Setup ergänzte Dep wurde beim Coolify-Build still verworfen.
+
+**Korrektur:**
+- Dockerfile installiert jetzt `uv` (`pip install --no-cache-dir uv`) und ruft `uv sync --frozen --no-dev --no-install-project` gegen `backend/uv.lock` auf. Lockfile-getrieben, mit SHA-256-Hash-Verifikation. `pyproject.toml` deklariert das Dep-Set + Versions-Obergrenzen; `uv.lock` pinnt die exakten Versionen, die ausgeliefert werden. Lockfile gewinnt bei Konflikt.
+- `--no-install-project` weil die Runtime den App-Quellcode aus dem Filesystem-Pfad `/app/app` importiert (per `COPY app /app/app`), nicht über ein installiertes Wheel. Das venv unter `/app/.venv` hält nur die Drittabhängigkeiten.
+- `pyproject.toml` mit Defense-in-Depth-Obergrenzen gehärtet: `fastapi>=0.115.0,<1.0`, `pydantic>=2.9.0,<3.0`, `supabase>=2.0.0,<3.0`, `bcrypt==4.0.1` (exakt — Projektregel CLAUDE.md). Verhindert dass ein späteres `uv lock` versehentlich einen Breaking-Major einzieht.
+- `uv.lock` regeneriert. bcrypt 5.0.0 → 4.0.1 (downgrade), xlrd + xlwt neu hinzugefügt. 88 Pakete final, keine transitiven Konflikte.
+
+**Dokumentation:** Neuer Abschnitt „Build & deploy" in `xqt5-ai-plattform/CLAUDE.md`, Fehlerjournal-Eintrag in `docs/CODING-DOKUMENT.md`, Inline-Header-Kommentar im Dockerfile.
+
+Dateien: `backend/Dockerfile`, `backend/pyproject.toml`, `backend/uv.lock`, `CLAUDE.md`, `docs/CODING-DOKUMENT.md`
+
+---
+
+## `.xls`-Support + Legacy-Fixture (2026-05-11)
+
+Erweiterung des Upload-Pfads um das Legacy-BIFF8-Excel-Format `.xls`. Dep `xlrd>=1.2,<2.0` (xlrd ≥ 2.0 hat die `.xls`-Unterstützung absichtlich entfernt; das Format ist seit 1997 eingefroren, daher ist die Wartungsunsicherheit hier vertretbar). Extractor `_extract_xls_text` in `documents.py:213` spiegelt die XLSX-Logik: pro Sheet ein `## SheetName`-Heading + Markdown-Tabelle. `.xls` im `SUPPORTED_UPLOAD_EXTENSIONS`-Tupel und `_FILE_TYPE_BY_EXT`-Map ergänzt; Frontend-`accept`-Attribute synchron.
+
+Build-Skript erweitert: neue Funktion `build_finanzen_legacy_xls()` in `scripts/build_corpus.py` schreibt eine einzelne `Bilanz_Alt`-Sheet im BIFF8-Format via xlwt. Produkt: `docs/tests/phase3/corpus/musterbau/finanzen_legacy.xls` (5,6 KB, 14 Zeilen × 2 Spalten). Wiederverwendet die gefrorenen MUSTERBAU.md-Konstanten. xlwt ist nicht in den Production-Deps, sondern im optionalen `corpus`-Extra in `pyproject.toml` — wird nur für Fixture-Regenerierung gebraucht.
+
+**`.doc` und `.ppt` bewusst geschoben.** Diese Legacy-Binärformate benötigen System-Tool-Subprozesse (`antiword`, `catdoc`) als Nixpkgs-Einträge. Würde das Coolify-Image um ~15 MB aufblähen. `.pptx` wurde nach detailliertem Audit ebenfalls geschoben (siehe nächster Abschnitt). Revisit bei OCR-Pipeline-v2-Adoption (Roadmap #6, Docling unterstützt `.pptx`/`.docx`/`.xlsx` nativ).
+
+Dateien: `backend/app/documents.py`, `backend/app/main.py`, `backend/pyproject.toml`, `backend/uv.lock`, `frontend/src/components/FileUpload.jsx`, `frontend/src/components/PoolDocuments.jsx`, `scripts/build_corpus.py`, `docs/tests/phase3/corpus/musterbau/finanzen_legacy.xls` (neu)
+
+---
+
+## `.pptx`-Fixture nach `_shelved/` verschoben (2026-05-11)
+
+Eine adversarielle Code-Review von `python-pptx` (PyPI 1.0.2, MIT, einziger pure-Python-Pfad für PPTX-Extraktion) ergab drei stille Datenverluste: (1) Bilder auf Folien werden komplett verworfen, (2) Text innerhalb von Group-Shapes wird nicht rekursiv erreicht, (3) Notes-Slides (Sprechernotizen) werden standardmäßig nicht geliefert. Eine echte Strategiepräsentation würde damit ihre substanzielle Diagramm- und Notiz-Inhalte verlieren, ohne dass das System einen Warning ausgibt — der Worst-Case bei Retrieval, da der Index dann selbstüberzeugend unvollständig ist.
+
+Die bereits generierte Test-Fixture `strategieklausur_2025.pptx` (44 KB, 11 Folien, rein textbasiert) hätte einen Smoke-Test problemlos passiert und das Real-World-Problem verdeckt. Entscheidung: PPTX zusammen mit `.ppt` und `.doc` parken bis OCR-Pipeline v2 (Docling) verfügbar ist — Docling liest `.pptx`/`.docx`/`.xlsx` mit Layout-Bewusstsein inklusive Bilder und Charts.
+
+Die Fixture wurde nach `docs/tests/phase3/corpus/_shelved/` verschoben (nicht gelöscht — soll mit dem Extractor reaktiviert werden). Plus neue Datei `_shelved/README.md` mit dem Begründungsblock + Reaktivierungs-Checkliste für die spätere Wiederbelebung.
+
+Dateien: `docs/tests/phase3/corpus/_shelved/strategieklausur_2025.pptx` (verschoben aus `corpus/musterbau/`), `docs/tests/phase3/corpus/_shelved/README.md` (neu)
+
+---
+
+## Multi-Datei-Upload mit Concurrency=2 + 401-Retry-Fix (2026-05-11)
+
+**User-Wunsch:** mehrere Dateien gleichzeitig hochladen, gemischte Filetypes. Vorher: Single-File-Picker, Single-File-XHR, kein Batch-Konzept.
+
+**Frontend (`FileUpload.jsx` + `PoolDocuments.jsx`):**
+- `<input type="file" multiple>` aktiviert die OS-Multi-Select-UI.
+- Per-Datei-State-Array `{ file, name, status: 'pending'|'uploading'|'done'|'error', pct: 0-100|-1, error: string|null }` lebt lokal in der jeweiligen Komponente (nicht in App.jsx — der bisherige `setError`-String-Blob hätte vorhergehende Fehler beim nächsten File überschrieben).
+- Worker-Pool-Semaphore mit `MAX_CONCURRENT = 2`: zwei Worker ziehen sequentiell den nächsten verfügbaren Index aus der Queue, bis sie leer ist. Worst-Case-Zeit für eine 8-PDF-Batch halbiert ohne die Rate-Limit-Wand zu rammen.
+- Warning-Dialog wenn Auswahl > 20 Dateien — informiert über das Backend-Rate-Limit von 20 Uploads/Minute.
+- Per-Datei-Status-Liste unter dem Upload-Button; Fehler stehen pro Zeile (Tooltip enthält Detail). „Liste leeren"-Button nach Abschluss räumt erledigte/fehlerhafte Einträge weg.
+
+**`api.js` `uploadWithXhr` 401-Retry (gleichzeitiger Bugfix):** Die XHR-Upload-Funktion liest das Access-Token einmal bei XHR-Open und retried nicht. Bei langen Batches (8 PDFs × 5–15 s OCR = 40–120 s) konnte das Token mid-Batch ablaufen → silent 401 → restliche Dateien starben unbemerkt. Fix: `xhr.onload` prüft auf `status === 401 && !_isRetry`, ruft `tryRefresh()`, retried die Anfrage genau einmal mit dem neuen Token. War ein pre-existing Bug, der auch Single-File-Uploads betraf, aber im neuen Multi-File-Kontext erst sichtbar geworden ist.
+
+**Rate-Limit unverändert bei 20/min** (User-Entscheidung): Files jenseits davon zeigen `HTTP 429` als Per-Datei-Fehler — der Batch crasht nicht, andere Dateien fließen weiter.
+
+**App.jsx + PoolDetail.jsx `handleUploadDocument`-Handler:** früher wurden Errors gefangen und in `setError()` gepackt, was die Per-Datei-Fehlerinfo zerstörte. Jetzt propagieren die Handler die Errors — FileUpload/PoolDocuments fangen sie in `processOne()` und schreiben sie in den Per-Datei-State-Array.
+
+CSS für die neuen Batch-Listen in `styles.css` (`.file-upload-list`, `.file-upload-item--{pending,uploading,done,error}`, `.pool-upload-batch`).
+
+Dateien: `frontend/src/api.js`, `frontend/src/App.jsx`, `frontend/src/components/FileUpload.jsx`, `frontend/src/components/PoolDocuments.jsx`, `frontend/src/components/PoolDetail.jsx`, `frontend/src/styles.css`
+
+---
+
+## Rheintal — Zweiter Testkorpus (Kunstakademie e. V., 2026-05-11)
+
+Aufbau eines zweiten, von Musterbau **bewusst disjunkten** Testkorpus, um Vielfalt in den RAG-Tests zu schaffen. Domäne, Vokabular, Entitäten, ID-Namensräume, Standort und Rechtsform haben null Überschneidung mit Musterbau.
+
+**Fiktive Organisation:** Kunstakademie Rheintal e. V. (Vereinsregister VR 4312 Freiburg im Breisgau, gegründet 1997, gemeinnützig nach §52 AO) mit 100%-Tochter Rheintal Akademie gemeinnützige GmbH. Sitz Freiburg, drei Standorte. 21 Festangestellte (PER-001…PER-021), 34 Honorar-Kursleiter (KL-01…KL-34), 87 Kurse (KU-001…KU-087), 318 Vereinsmitglieder, 10 Schlüsselereignisse 2025 (EV-01…EV-10), 1,24 Mio. € balancierter Jahreshaushalt (gemeinnützig, kein Jahresüberschuss).
+
+**Spec:** `docs/tests/phase3/corpus/rheintal/RHEINTAL.md` (330 Zeilen) — alle Werte gefroren, dient als Source-of-Truth für die Fixture-Agenten.
+
+**7 Fixtures unter `corpus/rheintal/`:** `taetigkeitsbericht_2025.pdf` (10,7 KB, 4 Seiten; rare terms `Werkförderverfahren`, `Druckgrafik-Residenz`); `honorarvertrag_gruber.docx` (40 KB, 42 Absätze + 2 Tabellen, 6 nummerierte §-Klauseln + Unterschriftenblock + Anhang; rare term `Atelierüberlassung`); `haushaltsplan_2025.xlsx` (9,7 KB, 3 Sheets, Einnahmen = Ausgaben = 1 240 000 €; rare terms `Satzungsklausel-7`, `Verwendungsnachweis-Frist`); `kursbelegung_legacy.xls` (9,7 KB, BIFF8, 33 historische Zeilen; rare term `Trimesterauslastungsindex`); `kursleiter.csv` (35 Zeilen, 7 Spalten); `akademieprogramm_t3.md` (320 Zeilen, 3-stufige Heading-Hierarchie; rare terms `Residenzstipendium`, `Atelierausleihe-Protokoll`); `protokoll_jhv_2025.txt` (394 Zeilen, drei kombinierte Sitzungsprotokolle; rare terms `Kursgruppenrotationsverfahren`, `Beitragsordnungsbeschluss`).
+
+**Cross-Datei-Anker (Multi-Doc-Retrieval-Test):** 5 Schlüsselfiguren tauchen in 4+ Fixtures auf (Dr. Margit Feuerbach Geschäftsführerin, Lukas Endres Programmdirektor, Prof. Anita Gruber KL-01, Urte Hamann Förderanträge, Franziska Oppelt Ausstellungskoordination). 10 BM25-Rare-Terms je exklusiv einer Datei zugewiesen — keine Überlappung mit Musterbau's Rare-Terms (Drewermann-Verfahren, OBELISK-7, etc.).
+
+`scripts/build_corpus.py` erweitert um vier neue Builder-Funktionen (`build_taetigkeitsbericht`, `build_honorarvertrag`, `build_haushaltsplan`, `build_kursbelegung_legacy`); `main()`-Output-Liste wuchs von 8 auf 12 Einträge. Sanity-Check bleibt dynamisch via `len(outputs)`.
+
+**Garantie keine Musterbau-Berührung:** Während der Generierung wurden ausschließlich Dateien unter `corpus/rheintal/` neu angelegt und `scripts/build_corpus.py` modifiziert; `git status` bestätigte dass weder `corpus/musterbau/` noch die anderen Subset-Ordner angefasst wurden.
+
+Dateien: `docs/tests/phase3/corpus/rheintal/RHEINTAL.md` (neu), `docs/tests/phase3/corpus/rheintal/*` (7 Fixtures, neu), `scripts/build_corpus.py`

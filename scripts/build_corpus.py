@@ -1831,6 +1831,1028 @@ def build_finanzen_legacy_xls(out_path: Path) -> None:
 
 
 # ===========================================================================
+# Rheintal corpus builders — Kunstakademie Rheintal e. V. / Rheintal Akademie gGmbH
+# Source of truth: docs/tests/phase3/corpus/rheintal/RHEINTAL.md (frozen v1.0)
+# All values are hardcoded inline from that document; do NOT mix with Musterbau constants.
+# ===========================================================================
+
+
+def _draw_kar_logo(canvas, x: float, y: float, width: float = 110, height: float = 28) -> None:
+    """Stylized KAR logo box: navy rectangle + orange left stripe + white 'KAR' text."""
+    from reportlab.lib.colors import HexColor
+    navy = HexColor("#213452")
+    orange = HexColor("#ee7f00")
+    white = HexColor("#ffffff")
+
+    canvas.saveState()
+    canvas.setFillColor(navy)
+    canvas.rect(x, y, width, height, fill=1, stroke=0)
+    canvas.setFillColor(orange)
+    canvas.rect(x, y, 7, height, fill=1, stroke=0)
+    canvas.setFillColor(white)
+    canvas.setFont("Helvetica-Bold", 11)
+    canvas.drawString(x + 13, y + 9, "KAR")
+    canvas.restoreState()
+
+
+def _draw_kar_page_header(canvas, page_width: float, page_height: float, title_text: str) -> None:
+    """Page header with KAR logo top-right and document title top-left."""
+    from reportlab.lib.colors import HexColor
+    navy = HexColor("#213452")
+
+    _draw_kar_logo(canvas, page_width - 145, page_height - 48)
+    canvas.saveState()
+    canvas.setStrokeColor(navy)
+    canvas.setLineWidth(1.5)
+    canvas.line(40, page_height - 58, page_width - 40, page_height - 58)
+    canvas.setFillColor(navy)
+    canvas.setFont("Helvetica-Bold", 9)
+    canvas.drawString(40, page_height - 48, title_text)
+    canvas.restoreState()
+
+
+def _draw_kar_page_footer(canvas, page_width: float, page_num: int) -> None:
+    """Page footer: thin navy rule, org name left, page number right."""
+    from reportlab.lib.colors import HexColor
+    grey = HexColor("#555555")
+    canvas.saveState()
+    canvas.setStrokeColor(HexColor("#213452"))
+    canvas.setLineWidth(0.5)
+    canvas.line(40, 38, page_width - 40, 38)
+    canvas.setFillColor(grey)
+    canvas.setFont("Helvetica", 8)
+    canvas.drawString(40, 26, "Kunstakademie Rheintal e. V. / Rheintal Akademie gGmbH | VR 4312 Freiburg | 2025")
+    canvas.drawRightString(page_width - 40, 26, f"Seite {page_num}")
+    canvas.restoreState()
+
+
+# ---------------------------------------------------------------------------
+# 1. taetigkeitsbericht_2025.pdf
+# ---------------------------------------------------------------------------
+
+def build_taetigkeitsbericht(out_path: Path) -> None:
+    """4-page Tätigkeitsbericht 2025 der Kunstakademie Rheintal e. V. + Rheintal Akademie gGmbH.
+
+    BM25 target terms: Werkförderverfahren (≥ 2×), Druckgrafik-Residenz (≥ 2×).
+    References: PER-001, PER-002, PER-003, PER-009, PER-011, KL-01.
+    Events: EV-01, EV-03, EV-05, EV-08.
+    """
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.colors import HexColor, white
+    from reportlab.lib.units import cm
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
+        HRFlowable,
+    )
+    from reportlab.pdfgen import canvas as rl_canvas
+
+    PAGE_W, PAGE_H = A4
+    MARGIN = 2.5 * cm
+    NAVY_RL = HexColor("#213452")
+    ORANGE_RL = HexColor("#ee7f00")
+
+    styles = getSampleStyleSheet()
+
+    def sty(name, **kw):
+        base = kw.pop("base", "Normal")
+        return ParagraphStyle(name, parent=styles[base], **kw)
+
+    TITLE = sty("KARTitle", fontSize=22, textColor=NAVY_RL, spaceBefore=0, spaceAfter=8,
+                fontName="Helvetica-Bold", leading=28)
+    SUBTITLE = sty("KARSub", fontSize=14, textColor=ORANGE_RL, spaceBefore=4, spaceAfter=12,
+                   fontName="Helvetica-Bold")
+    H1 = sty("KARh1", fontSize=14, textColor=NAVY_RL, spaceBefore=16, spaceAfter=6,
+             fontName="Helvetica-Bold")
+    H2 = sty("KARh2", fontSize=11, textColor=NAVY_RL, spaceBefore=10, spaceAfter=4,
+             fontName="Helvetica-Bold")
+    BODY = sty("KARBody", fontSize=10, leading=14, spaceBefore=4, spaceAfter=4)
+    SMALL = sty("KARSmall", fontSize=8, leading=11, textColor=HexColor("#555555"))
+
+    doc_title = "Tätigkeitsbericht 2025 — Kunstakademie Rheintal e. V."
+
+    story = []
+
+    # ── Page 1: Title + Organisation Profile ────────────────────────────────
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(Paragraph("Tätigkeitsbericht 2025", TITLE))
+    story.append(Paragraph("Kunstakademie Rheintal e. V. und Rheintal Akademie gemeinnützige GmbH", SUBTITLE))
+    story.append(HRFlowable(width="100%", thickness=2, color=ORANGE_RL, spaceAfter=12))
+
+    story.append(Paragraph("1. Organisationsprofil", H1))
+    story.append(Paragraph(
+        "Die Kunstakademie Rheintal e. V. wurde 1997 gegründet und hat ihren Sitz in "
+        "Freiburg im Breisgau, Baden-Württemberg (Vereinsregisternummer VR 4312 Freiburg im Breisgau). "
+        "Der Verein ist als gemeinnützige Organisation nach §52 AO von der Körperschaftsteuer befreit "
+        "und zählt zum Stichtag 31. Dezember 2025 insgesamt 318 ordentliche Mitglieder.",
+        BODY))
+    story.append(Paragraph(
+        "Die operative Kursabwicklung sowie alle Vertragsabschlüsse mit Honorarkräften werden über die "
+        "hundertprozentige Tochtergesellschaft Rheintal Akademie gemeinnützige GmbH (Stammkapital 25.000 €) "
+        "abgewickelt. Geschäftsführerin der gGmbH ist Dr. Margit Feuerbach (PER-002, im Amt seit 01.09.2008). "
+        "Vereinsvorsitzende ist Renate Quast (PER-001). Programmdirektor ist Lukas Endres (PER-003).",
+        BODY))
+    story.append(Paragraph(
+        "Im Berichtsjahr 2025 wurden 87 Kurse in elf Fachbereichen angeboten, betreut von 34 aktiven "
+        "Honorar-Kursleitern (KL-01 bis KL-34) und 21 Festangestellten (PER-001 bis PER-021). "
+        "Die geschätzte Gesamtzahl der Kursteilnehmer lag bei rund 1.200 Personen. "
+        "Ausstellungskoordinatorin Franziska Oppelt (PER-009) betreute sechs öffentliche Ausstellungen. "
+        "Urte Hamann (PER-011) verantwortete die Beantragung und Abwicklung aller Drittmittel.",
+        BODY))
+
+    org_data = [
+        ["Feld", "Wert"],
+        ["Organisation", "Kunstakademie Rheintal e. V."],
+        ["Vereinsregisternummer", "VR 4312 Freiburg im Breisgau"],
+        ["Gründungsjahr", "1997"],
+        ["Sitz", "Freiburg im Breisgau, Baden-Württemberg"],
+        ["Rechtsform Träger", "Eingetragener Verein (e. V.)"],
+        ["100%-Tochter", "Rheintal Akademie gemeinnützige GmbH"],
+        ["gGmbH Stammkapital", "25.000 €"],
+        ["Steuerlicher Status", "Gemeinnützig nach §52 AO, steuerbefreit"],
+        ["Jahresbudget 2025", "1.240.000 € (Einnahmen = Ausgaben; kein Jahresüberschuss)"],
+        ["Vereinsvorsitzende", "Renate Quast (PER-001)"],
+        ["Geschäftsführerin gGmbH", "Dr. Margit Feuerbach (PER-002, seit 01.09.2008)"],
+    ]
+
+    org_table = Table(org_data, colWidths=[6 * cm, PAGE_W - 2 * MARGIN - 6 * cm])
+    org_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY_RL),
+        ("TEXTCOLOR", (0, 0), (-1, 0), white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [HexColor("#f5f5f5"), white]),
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#cccccc")),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(org_table)
+
+    story.append(PageBreak())
+
+    # ── Page 2: Programmhöhepunkte 2025 ─────────────────────────────────────
+    story.append(Paragraph("2. Programmhöhepunkte 2025", H1))
+
+    story.append(Paragraph("2.1 Druckgrafik-Residenz (EV-01)", H2))
+    story.append(Paragraph(
+        "Auf der Jahresauftaktklausur des Vorstands am 15. Januar 2025 (EV-01) beschlossen "
+        "Renate Quast (PER-001), Dr. Margit Feuerbach (PER-002), Lukas Endres (PER-003) und "
+        "Urte Hamann (PER-011) die Einrichtung einer Druckgrafik-Residenz an der Kunstakademie. "
+        "Das Residenzprogramm richtet sich an profilierte Druckgrafikerinnen und -grafiker "
+        "und sieht die Nutzung der Druckwerkstatt im Hauptgebäude Gerberau für einen Zeitraum "
+        "von drei bis sechs Monaten vor. Prof. Anita Gruber (KL-01) übernahm die künstlerische "
+        "Leitung der Druckgrafik-Residenz und betreute das begleitende Kursprogramm (KU-003).",
+        BODY))
+    story.append(Paragraph(
+        "Die Druckgrafik-Residenz wurde von der Stiftung Kunstförderung Oberrhein mit "
+        "projektgebundenen Mitteln unterstützt (EV-01 / EV-07). Das Residenzprogramm "
+        "gilt als besonderer programmatischer Erfolg des Berichtsjahres.",
+        BODY))
+
+    story.append(Paragraph("2.2 Sommeratelier-Workshopwoche (EV-06)", H2))
+    story.append(Paragraph(
+        "Vom 17. bis 23. Juli 2025 fand an allen drei Standorten (GER, WIE, STT) die "
+        "Sommeratelier-Workshopwoche statt (EV-06). Sechs Intensivworkshops wurden durchgeführt, "
+        "betreut von KL-01 Prof. Gruber (Druckgrafik), KL-03 Ingeborg Zellner (Aquarell), "
+        "KL-05 Susanne Wältermann (Skulptur) und KL-06 Florian Neugebauer (Digitale Medien). "
+        "Die Auslastung des Außenateliers Wiehre erreichte einen Rekordwert. "
+        "Insgesamt nahmen rund 60 Teilnehmerinnen und Teilnehmer teil.",
+        BODY))
+
+    story.append(Paragraph('2.3 Frühjahrsausstellung „Form und Farbe“ (EV-03)', H2))
+    story.append(Paragraph(
+        "Am 3. März 2025 eröffnete im Gerberau-Ausstellungssaal die Frühjahrsausstellung "
+        '„Form und Farbe“ (EV-03). Anwesend waren Vereinsvorsitzende Renate Quast (PER-001), '
+        "Ausstellungskoordinatorin Franziska Oppelt (PER-009), Prof. Anita Gruber (KL-01) "
+        "sowie Roland Kleiber (KL-08) und rund 112 Gäste. "
+        "Im Rahmen der Eröffnung wurde der Verwendungsnachweis im Werkförderverfahren "
+        "des Landes Baden-Württemberg eingereicht. Das Werkförderverfahren erforderte "
+        "die Vorlage vollständiger Projektdokumentationen sowie den Nachweis der "
+        "Mittelverwendung gegenüber der Bewilligungsbehörde. Die Ausstellung lief bis 30. April 2025.",
+        BODY))
+
+    story.append(Paragraph('2.4 Ausstellungseröffnung „Lichtwege" (EV-09)', H2))
+    story.append(Paragraph(
+        'Am 5. November 2025 eröffnete im Gerberau-Saal die Ausstellung „Lichtwege" (EV-09). '
+        "Franziska Oppelt (PER-009) koordinierte die Eröffnung, an der Pavlos Demetriou (KL-04), "
+        "Marta Szymańska (KL-07) und 89 Gäste teilnahmen. Erstmals wurde im Zuge dieser "
+        "Ausstellung ein Atelierausleihe-Protokoll für eine externe Künstlerin angelegt.",
+        BODY))
+
+    story.append(PageBreak())
+
+    # ── Page 3: Finanzkurzübersicht ──────────────────────────────────────────
+    story.append(Paragraph("3. Finanzkurzübersicht 2025", H1))
+    story.append(Paragraph(
+        "Das Jahresbudget 2025 beläuft sich auf 1.240.000 € (Einnahmen = Ausgaben). "
+        "Als gemeinnützige Organisation ist die Rheintal Akademie gGmbH zur zeitnahen "
+        "Mittelverwendung nach §55 Abs. 1 Nr. 5 AO verpflichtet. Das Jahresergebnis beträgt 0 €.",
+        BODY))
+
+    fin_data = [
+        ["EINNAHMEN", "Betrag (€)", "Anteil (%)"],
+        ["Kursgebühren", "644.800", "52,0 %"],
+        ["Mitgliedsbeiträge", "99.200", "8,0 %"],
+        ["Öffentliche Fördergelder (Land BW + Stadt Freiburg)", "384.400", "31,0 %"],
+        ["Stiftungsmittel projektgebunden", "111.600", "9,0 %"],
+        ["Summe Einnahmen", "1.240.000", "100,0 %"],
+    ]
+
+    fin_table = Table(fin_data, colWidths=[9.5 * cm, 3 * cm, 2.5 * cm])
+    fin_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY_RL),
+        ("TEXTCOLOR", (0, 0), (-1, 0), white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [HexColor("#f5f5f5"), white]),
+        ("BACKGROUND", (0, -1), (-1, -1), ORANGE_RL),
+        ("TEXTCOLOR", (0, -1), (-1, -1), white),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#cccccc")),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(fin_table)
+    story.append(Spacer(1, 0.4 * cm))
+
+    aus_data = [
+        ["AUSGABEN", "Betrag (€)", "Anteil (%)"],
+        ["Personalaufwand Festangestellte", "682.000", "55,0 %"],
+        ["Honorare Kursleiter", "198.400", "16,0 %"],
+        ["Raum / Betrieb (Miete, Nebenkosten, Instandhaltung)", "198.400", "16,0 %"],
+        ["Programm / Material (Werkstoffe, Ausstellungskosten)", "99.200", "8,0 %"],
+        ["Verwaltung / Öffentlichkeitsarbeit", "62.000", "5,0 %"],
+        ["Summe Ausgaben", "1.240.000", "100,0 %"],
+    ]
+
+    aus_table = Table(aus_data, colWidths=[9.5 * cm, 3 * cm, 2.5 * cm])
+    aus_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY_RL),
+        ("TEXTCOLOR", (0, 0), (-1, 0), white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [HexColor("#f5f5f5"), white]),
+        ("BACKGROUND", (0, -1), (-1, -1), ORANGE_RL),
+        ("TEXTCOLOR", (0, -1), (-1, -1), white),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#cccccc")),
+        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(aus_table)
+    story.append(Spacer(1, 0.3 * cm))
+    story.append(Paragraph(
+        "Jahresergebnis: 0 € — Die Organisation ist gemeinnützig; ein Jahresüberschuss "
+        "ist weder angestrebt noch zulässig.",
+        sty("KARFinNote", fontSize=9, fontName="Helvetica-Bold", textColor=NAVY_RL)))
+
+    story.append(PageBreak())
+
+    # ── Page 4: Fördernachweis ───────────────────────────────────────────────
+    story.append(Paragraph("4. Fördernachweis 2025", H1))
+    story.append(Paragraph(
+        "Die öffentliche Förderung des Landes Baden-Württemberg wurde für das Haushaltsjahr 2025 "
+        "mit Bescheid vom 9. Juni 2025 bewilligt (EV-05, adressiert an Urte Hamann, PER-011). "
+        "Die Zuwendung in Höhe von 228.000 € dient der Finanzierung des laufenden Betriebs "
+        "sowie anteiliger Personalkosten. Der Verwendungsnachweis ist bis zum 31. Januar 2026 "
+        "bei der Bewilligungsbehörde einzureichen.",
+        BODY))
+    story.append(Paragraph(
+        "Das Werkförderverfahren des Landes Baden-Württemberg erfordert die Vorlage "
+        "vollständiger Projektdokumentationen sowie den Nachweis der Mittelverwendung. "
+        'Im Rahmen des Werkförderverfahrens wurde für die Ausstellung „Form und Farbe” (EV-03) '
+        "ein Projektbericht eingereicht, unterzeichnet von PER-002 Feuerbach und PER-011 Hamann.",
+        BODY))
+
+    foerd_data = [
+        ["Geldgeber", "Art", "Betrag (€)", "Verwendungszweck", "Nachweis-Frist"],
+        ["Land Baden-Württemberg", "Institutionelle Förderung", "228.000",
+         "Laufender Betrieb, Personalkosten", "31.01.2026"],
+        ["Stadt Freiburg im Breisgau", "Projektförderung Kulturprogramm", "156.400",
+         "Ausstellungen, Bildungsprojekte", "28.02.2026"],
+        ["Stiftung Kunstförderung Oberrhein", "Projektgebundene Mittel", "68.000",
+         "Druckgrafik-Residenz (EV-01 / EV-07)", "30.06.2026"],
+        ["Deutsche Kulturstiftung Süd", "Projektgebundene Mittel", "43.600",
+         "Fotografie-Reihe Außenatelier", "30.09.2026"],
+        ["Summe Förderung", "", "496.000", "", ""],
+    ]
+
+    foerd_table = Table(
+        foerd_data,
+        colWidths=[4.2 * cm, 3.4 * cm, 2.0 * cm, 3.8 * cm, 1.8 * cm],
+    )
+    foerd_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), NAVY_RL),
+        ("TEXTCOLOR", (0, 0), (-1, 0), white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -2), [HexColor("#f5f5f5"), white]),
+        ("BACKGROUND", (0, -1), (-1, -1), ORANGE_RL),
+        ("TEXTCOLOR", (0, -1), (-1, -1), white),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#cccccc")),
+        ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    story.append(foerd_table)
+    story.append(Spacer(1, 0.4 * cm))
+    story.append(Paragraph(
+        "Jahreshauptversammlung: Am 22. Oktober 2025 (EV-08) genehmigte die Mitgliederversammlung "
+        "mit 318 anwesenden oder vertretenen Mitgliedern den Jahresabschluss 2024.",
+        BODY))
+    story.append(Spacer(1, 0.3 * cm))
+    story.append(Paragraph(
+        "Freiburg im Breisgau, Dezember 2025 — Renate Quast (PER-001), Vereinsvorsitzende | "
+        "Dr. Margit Feuerbach (PER-002), Geschäftsführerin gGmbH | "
+        "Lukas Endres (PER-003), Programmdirektor",
+        SMALL))
+
+    # ── Canvas class: header + footer on every page ──────────────────────────
+    class KARHFC(rl_canvas.Canvas):
+        """Canvas subclass that draws the KAR header+footer on every page.
+
+        Only showPage() is overridden so that headers/footers are drawn before
+        each page is committed. save() is NOT overridden — overriding it would
+        draw on a blank extra page that ReportLab opens after the last showPage().
+        """
+        def __init__(self, filename, **kwargs):
+            super().__init__(filename, **kwargs)
+            self._pn = 0
+
+        def showPage(self):
+            self._pn += 1
+            _draw_kar_page_header(self, PAGE_W, PAGE_H, doc_title)
+            _draw_kar_page_footer(self, PAGE_W, self._pn)
+            super().showPage()
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    doc = SimpleDocTemplate(
+        str(out_path),
+        pagesize=A4,
+        leftMargin=MARGIN, rightMargin=MARGIN,
+        topMargin=3.5 * cm, bottomMargin=2.5 * cm,
+        title=doc_title,
+        author="Kunstakademie Rheintal e. V.",
+    )
+    doc.build(story, canvasmaker=KARHFC)
+
+
+# ---------------------------------------------------------------------------
+# 2. honorarvertrag_gruber.docx
+# ---------------------------------------------------------------------------
+
+def build_honorarvertrag(out_path: Path) -> None:
+    """Honorar-Rahmenvertrag zwischen Rheintal Akademie gGmbH (PER-002) und KL-01 Prof. Gruber.
+
+    BM25 target term: Atelierüberlassung (≥ 3× in §4, explicitly defined).
+    Reference event: EV-02 (14.02.2025).
+    Structure: Title + Präambel + §1–§6 + Unterschriftenblock + Anhang Lehrplan.
+    §2 contains a Markdown-style table of Stundensätze.
+    """
+    from docx import Document
+    from docx.shared import Pt, RGBColor, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.oxml.ns import qn
+    from docx.oxml import OxmlElement
+
+    doc = Document()
+
+    for section in doc.sections:
+        section.top_margin = Cm(2.5)
+        section.bottom_margin = Cm(2.5)
+        section.left_margin = Cm(3.0)
+        section.right_margin = Cm(2.5)
+
+    # ── Title ──────────────────────────────────────────────────────────────
+    title = doc.add_paragraph("Honorar-Rahmenvertrag — Lehrtätigkeit Druckgrafik", style="Title")
+    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+    meta = doc.add_paragraph(
+        "Rheintal Akademie gemeinnützige GmbH — Prof. Anita Gruber (KL-01) | "
+        "Datum: 14.02.2025 (EV-02) | Ort: Freiburg im Breisgau"
+    )
+    meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    meta.runs[0].italic = True
+    meta.runs[0].font.size = Pt(10)
+    meta.runs[0].font.color.rgb = RGBColor(33, 52, 82)
+
+    # ── Präambel ───────────────────────────────────────────────────────────
+    doc.add_heading("Präambel", level=1)
+    doc.add_paragraph(
+        "Die Rheintal Akademie gemeinnützige GmbH (nachfolgend „Akademie”), vertreten durch ihre "
+        "Geschäftsführerin Dr. Margit Feuerbach (PER-002), Gerberau 12, 79098 Freiburg im Breisgau, "
+        "und Frau Prof. Anita Gruber (KL-01), freischaffende Druckgrafikerin und Hochschullehrerin "
+        "(nachfolgend „Kursleiterin”), schließen den nachfolgenden Honorar-Rahmenvertrag über die "
+        "Lehrtätigkeit im Bereich Druckgrafik sowie über die damit verbundene Nutzung der "
+        "Infrastruktur der Akademie. Dieser Vertrag tritt am 14. Februar 2025 (EV-02) in Kraft "
+        "und ersetzt alle vorherigen mündlichen oder schriftlichen Absprachen zwischen den Parteien."
+    )
+
+    # ── §1 Vertragsgegenstand ──────────────────────────────────────────────
+    doc.add_heading("§1 Vertragsgegenstand", level=2)
+    doc.add_paragraph(
+        "Gegenstand dieses Vertrages ist die selbstständige Lehrtätigkeit der Kursleiterin "
+        "im Fachbereich Druckgrafik (Kürzel DRU) an der Kunstakademie Rheintal e. V. und der "
+        "Rheintal Akademie gGmbH. Die Kursleiterin übernimmt die eigenverantwortliche Planung, "
+        "Vorbereitung und Durchführung der ihr zugewiesenen Kurse gemäß dem jeweils gültigen "
+        "Trimesterprogramm der Akademie."
+    )
+    doc.add_paragraph(
+        "Die Kursleiterin ist im Rahmen dieses Vertrages nicht als Arbeitnehmerin tätig. "
+        "Sie ist in der Gestaltung ihrer Unterrichtsmethoden frei, soweit sie den inhaltlichen "
+        "Rahmen der Kursausschreibung einhält. Die Akademie stellt die Kursräume und die "
+        "erforderliche Grundausstattung zur Verfügung; Spezialmaterial kann nach Absprache "
+        "aus dem Akademiebestand entnommen oder auf Kosten der Akademie beschafft werden."
+    )
+
+    # ── §2 Vergütung ──────────────────────────────────────────────────────
+    doc.add_heading("§2 Vergütung", level=2)
+    doc.add_paragraph(
+        "Die Kursleiterin erhält für ihre Lehrtätigkeit ein Honorar gemäß der nachfolgenden "
+        "Stundensatztabelle. Grundlage der Abrechnung ist die tatsächlich geleistete Unterrichtszeit "
+        "inklusive unmittelbarer Vor- und Nachbereitung (max. 15 % Pauschale). Die Abrechnung "
+        "erfolgt monatlich auf Basis einer von der Kursleiterin eingereichten Honorarnote."
+    )
+
+    # Stundensatz table
+    rate_table = doc.add_table(rows=5, cols=3)
+    rate_table.style = "Table Grid"
+    headers = ["Kurstyp", "Stundensatz (€)", "Anmerkung"]
+    hdr_row = rate_table.rows[0]
+    for i, h in enumerate(headers):
+        cell = hdr_row.cells[i]
+        cell.text = h
+        cell.paragraphs[0].runs[0].bold = True
+        cell.paragraphs[0].runs[0].font.color.rgb = RGBColor(255, 255, 255)
+        tc_pr = cell._tc.get_or_add_tcPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:fill"), "213452")
+        shd.set(qn("w:color"), "auto")
+        shd.set(qn("w:val"), "clear")
+        tc_pr.append(shd)
+
+    rate_rows = [
+        ("Einführungskurs Druckgrafik", "85 €", "Standardsatz gemäß Honorarordnung"),
+        ("Vertiefungskurs Druckgrafik", "90 €", "Erhöhter Satz bei ≥ 8 Std./Kurs"),
+        ("Intensivworkshop (Sommeratelier / Residenz)", "95 €", "Residenz- und Workshopformate"),
+        ("Gastvorlesung / Einzelveranstaltung", "85 €", "Gleichgestellt mit Einführungskurs"),
+    ]
+    for r_idx, (kurs, satz, anm) in enumerate(rate_rows):
+        row = rate_table.rows[r_idx + 1]
+        row.cells[0].text = kurs
+        row.cells[1].text = satz
+        row.cells[2].text = anm
+
+    doc.add_paragraph("")
+
+    doc.add_paragraph(
+        "Reisekosten werden nur erstattet, soweit sie vorab schriftlich durch die Geschäftsführerin "
+        "Dr. Margit Feuerbach (PER-002) genehmigt wurden. Alle Honorare sind zuzüglich der "
+        "gesetzlichen Umsatzsteuer, sofern die Kursleiterin zur Umsatzsteuer optiert."
+    )
+
+    # ── §3 Laufzeit ──────────────────────────────────────────────────────
+    doc.add_heading("§3 Laufzeit", level=2)
+    doc.add_paragraph(
+        "Dieser Vertrag gilt ab dem 14. Februar 2025 (EV-02) und hat eine Grundlaufzeit bis zum "
+        "31. Dezember 2025. Er verlängert sich automatisch um jeweils ein Kalenderjahr, sofern "
+        "keine der Parteien ihn bis spätestens drei Monate vor Ablauf schriftlich kündigt."
+    )
+    doc.add_paragraph(
+        "Für das Trimester 3 (September bis Dezember 2025) wurde das Residenzstipendium der "
+        "Kursleiterin im Rahmen des T3-Kickoffs (EV-07, 12.09.2025) verlängert. "
+        "Die Kursleiterin betreut im laufenden Programmjahr 2025 vier aktive Kurse "
+        "(KU-001, KU-002, KU-003 sowie einen weiteren Druckgrafikkurs)."
+    )
+    doc.add_paragraph(
+        "Anpassungen der Honorarsätze werden im gegenseitigen Einvernehmen schriftlich "
+        "vereinbart und gelten ab dem nächsten vollen Trimesterbeginn. Bereits laufende "
+        "Kurse werden zu den bei Kursbeginn vereinbarten Sätzen abgerechnet."
+    )
+
+    # ── §4 Atelierüberlassung ─────────────────────────────────────────────
+    doc.add_heading("§4 Atelierüberlassung", level=2)
+    doc.add_paragraph(
+        "Die Atelierüberlassung regelt das Recht der Kursleiterin, die Druckwerkstatt im "
+        "Hauptgebäude Gerberau (GER) außerhalb der regulären Kurszeiten für ihre eigene "
+        "künstlerische Arbeit unentgeltlich zu nutzen. Die Atelierüberlassung ist auf "
+        "maximal 8 Stunden pro Woche begrenzt und muss mindestens 48 Stunden im Voraus "
+        "schriftlich bei Gundula Heth (PER-007, Atelierleitung Gerberau) angemeldet werden."
+    )
+    doc.add_paragraph(
+        "Die Atelierüberlassung umfasst die Nutzung aller fest installierten Druckpressen, "
+        "Walzen und Säurewannen der Druckwerkstatt. Verbrauchsmaterialien (Farben, Papier, "
+        "Ätzchemikalien) sind von der Kursleiterin auf eigene Kosten zu beschaffen oder "
+        "gegen ein pauschales Materialentgelt von 15 € pro Nutzungstag aus dem Akademiebestand "
+        "zu entnehmen. Die Kursleiterin hat die Pflicht, den Arbeitsbereich nach jeder Nutzung "
+        "ordnungsgemäß zu reinigen und den Zustand gemäß dem Übergabeprotokoll zu dokumentieren."
+    )
+    doc.add_paragraph(
+        "Im Falle einer Verletzung der Pflichten aus der Atelierüberlassung — insbesondere "
+        "bei wiederholter Überschreitung der Wochenstundengrenze oder schuldhafter Beschädigung "
+        "von Geräten — kann die Akademie die Atelierüberlassung mit sofortiger Wirkung aussetzen. "
+        "Eine Wiederherstellung des Rechts auf Atelierüberlassung ist erst nach schriftlicher "
+        "Abstimmung mit der Geschäftsführerin Dr. Margit Feuerbach (PER-002) möglich."
+    )
+    doc.add_paragraph(
+        "Werke, die im Rahmen der Atelierüberlassung entstehen, sind ausschließlich Eigentum "
+        "der Kursleiterin. Die Akademie erwirbt durch die Atelierüberlassung keinerlei Nutzungs-, "
+        "Verwertungs- oder Ausstellungsrechte an den entstehenden Werken, sofern nicht gesondert "
+        "schriftlich vereinbart."
+    )
+
+    # ── §5 Urheberrecht und Verwertung ────────────────────────────────────
+    doc.add_heading("§5 Urheberrecht und Verwertung", level=2)
+    doc.add_paragraph(
+        "Sämtliche im Rahmen der Lehrtätigkeit erstellten Kursmaterialien (Handouts, "
+        "Arbeitsblätter, digitale Präsentationen) verbleiben im Eigentum der Kursleiterin. "
+        "Die Akademie erhält ein nicht-exklusives, nicht übertragbares Nutzungsrecht "
+        "für die interne Verwendung in den vereinbarten Kursen."
+    )
+    doc.add_paragraph(
+        "Die Kursleiterin stimmt zu, dass die Akademie Fotos und kurze Videoaufnahmen "
+        "des Kursbetriebs für Öffentlichkeitsarbeit und Programmwerbung verwenden darf, "
+        "sofern die Kursleiterin persönlich abgebildet ist und der Verwendung im Einzelfall "
+        "zugestimmt hat. Eine kommerzielle Verwertung außerhalb der Akademiekommunikation "
+        "ist ausgeschlossen."
+    )
+
+    # ── §6 Kündigung und Schlussbestimmungen ──────────────────────────────
+    doc.add_heading("§6 Kündigung und Schlussbestimmungen", level=2)
+    doc.add_paragraph(
+        "Dieser Vertrag kann von beiden Parteien mit einer Frist von drei Monaten zum "
+        "Trimesterende schriftlich gekündigt werden. Eine außerordentliche Kündigung aus "
+        "wichtigem Grund ist jederzeit möglich. Als wichtiger Grund gilt insbesondere die "
+        "wiederholte und schuldhafte Verletzung vertraglicher Pflichten oder die dauerhaft "
+        "mangelnde Eignung für die vereinbarten Lehrleistungen."
+    )
+    doc.add_paragraph(
+        "Änderungen und Ergänzungen dieses Vertrages bedürfen der Schriftform. "
+        "Mündliche Nebenabreden bestehen nicht. Sollte eine Bestimmung dieses Vertrages "
+        "unwirksam sein, bleibt der übrige Vertrag davon unberührt; die unwirksame Bestimmung "
+        "ist durch eine wirksame zu ersetzen, die dem wirtschaftlichen Zweck der ursprünglichen "
+        "Regelung möglichst nahekommt."
+    )
+    doc.add_paragraph(
+        "Erfüllungsort und Gerichtsstand ist Freiburg im Breisgau. Es gilt das Recht der "
+        "Bundesrepublik Deutschland. Beide Parteien erhalten ein Original dieses Vertrages."
+    )
+
+    # ── Unterschriftenblock ───────────────────────────────────────────────
+    doc.add_paragraph("")
+    doc.add_heading("Unterschriften", level=1)
+
+    sign_data = [
+        ["Datum:", "14.02.2025 (EV-02)"],
+        ["Ort:", "Freiburg im Breisgau"],
+        ["Für die Rheintal Akademie gGmbH:", "Dr. Margit Feuerbach (PER-002), Geschäftsführerin"],
+        ["Kursleiterin:", "Prof. Anita Gruber (KL-01)"],
+    ]
+    sign_table = doc.add_table(rows=4, cols=2)
+    sign_table.style = "Table Grid"
+    for r_idx, (label, value) in enumerate(sign_data):
+        row = sign_table.rows[r_idx]
+        row.cells[0].text = label
+        row.cells[0].paragraphs[0].runs[0].bold = True
+        row.cells[1].text = value
+
+    doc.add_paragraph("")
+    doc.add_paragraph(
+        "_________________________                    _________________________"
+    )
+    doc.add_paragraph(
+        "Dr. Margit Feuerbach (PER-002)               Prof. Anita Gruber (KL-01)"
+    ).runs[0].italic = True
+
+    # ── Anhang: Lehrplan ──────────────────────────────────────────────────
+    doc.add_paragraph("")
+    doc.add_heading("Anhang: Lehrplan Druckgrafik-Kurse", level=1)
+    doc.add_paragraph(
+        "Nachfolgend sind die Semesterinhalte aufgeführt, die Prof. Anita Gruber (KL-01) "
+        "in den ihr zugewiesenen Kursen zu vermitteln hat. Die Inhalte sind als Rahmenplan "
+        "zu verstehen; die methodische Umsetzung liegt im Ermessen der Kursleiterin."
+    )
+
+    lehrplan_items = [
+        "Einführung in die Geschichte und Technik der Druckgrafik: Hochdruck, Tiefdruck, Flachdruck, Siebdruck",
+        "Radierung: Vorbereitung der Druckplatte, Ätzverfahren, Drucktechnik, Reinigung und Lagerung",
+        "Holzschnitt und Linolschnitt: Werkzeugkunde, Schnitttechniken, Farbregisterdruck",
+        "Experimentelle Druckgrafik: Mixed-Media-Ansätze, Monotypie, Transferdrucktechniken",
+        "Druckwerkstatt-Management: Sicherheitsunterweisung, Gerätepflege, Umgang mit Druckchemikalien",
+        "Werkpräsentation und Portfolioaufbau: Dokumentation eigener Arbeiten, Ausstellungsvorbereitung",
+        "Einführung in digitale Druckverfahren und deren Kombination mit analogen Techniken",
+    ]
+
+    for item in lehrplan_items:
+        p = doc.add_paragraph(style="List Bullet")
+        p.add_run(item)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(out_path)
+
+
+# ---------------------------------------------------------------------------
+# 3. haushaltsplan_2025.xlsx
+# ---------------------------------------------------------------------------
+
+def build_haushaltsplan(out_path: Path) -> None:
+    """3-sheet Haushaltsplan 2025 der Kunstakademie Rheintal e. V. / Rheintal Akademie gGmbH.
+
+    Sheet 1: Einnahmen-Ausgaben (incl. Satzungsklausel-7)
+    Sheet 2: Förderübersicht (incl. Verwendungsnachweis-Frist ≥ 2×)
+    Sheet 3: Honorarübersicht (34 KL rows, Summe = 198.400 €)
+    BM25 target terms: Satzungsklausel-7 (≥ 1×), Verwendungsnachweis-Frist (≥ 2×).
+    References: PER-002 Feuerbach, PER-005 Schipper, PER-011 Hamann.
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+
+    HEADER_FILL = PatternFill("solid", fgColor="213452")
+    HEADER_FONT = Font(bold=True, color="FFFFFF", name="Calibri")
+    BOLD_FONT = Font(bold=True, name="Calibri")
+    NORMAL_FONT = Font(name="Calibri")
+    TOTAL_FILL = PatternFill("solid", fgColor="EE7F00")
+    TOTAL_FONT = Font(bold=True, color="FFFFFF", name="Calibri")
+    EUR_FMT = '#,##0 "€"'
+
+    double_bottom = Border(
+        bottom=Side(style="double"),
+        top=Side(style="thin"),
+    )
+
+    def col_width(ws, col, width):
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    # ── Sheet 1: Einnahmen-Ausgaben ──────────────────────────────────────
+    ws1 = wb.active
+    ws1.title = "Einnahmen-Ausgaben"
+
+    ws1["A1"] = ("Kunstakademie Rheintal e. V. / Rheintal Akademie gGmbH "
+                 "— Haushaltsplan 2025")
+    ws1["A1"].font = Font(bold=True, size=13, name="Calibri")
+    ws1["A2"] = "Verantwortlich: PER-005 Tobias Schipper (Finanzbuchhaltung)"
+    ws1["A2"].font = Font(italic=True, name="Calibri")
+    ws1["A3"] = "Geschäftsführerin gGmbH: PER-002 Dr. Margit Feuerbach | Drittmittel: PER-011 Urte Hamann"
+    ws1["A3"].font = Font(italic=True, name="Calibri")
+
+    # Einnahmen block
+    einnahmen_header_row = 5
+    ws1.cell(einnahmen_header_row, 1, "EINNAHMEN").font = Font(bold=True, size=11, name="Calibri")
+
+    einnahmen_rows = [
+        ("Position", "Betrag (€)"),
+        ("Kursgebühren", 644_800),
+        ("Mitgliedsbeiträge", 99_200),
+        ("Öffentliche Fördergelder (Land BW + Stadt Freiburg)", 384_400),
+        ("Stiftungsmittel projektgebunden", 111_600),
+        ("Summe Einnahmen", 1_240_000),
+    ]
+
+    r = einnahmen_header_row + 1
+    for i, (pos, val) in enumerate(einnahmen_rows):
+        ws1.cell(r, 1, pos)
+        ws1.cell(r, 2, val if isinstance(val, int) else val)
+        if i == 0:
+            ws1.cell(r, 1).font = HEADER_FONT
+            ws1.cell(r, 1).fill = HEADER_FILL
+            ws1.cell(r, 2).font = HEADER_FONT
+            ws1.cell(r, 2).fill = HEADER_FILL
+        elif pos.startswith("Summe"):
+            ws1.cell(r, 1).font = TOTAL_FONT
+            ws1.cell(r, 1).fill = TOTAL_FILL
+            ws1.cell(r, 2).font = TOTAL_FONT
+            ws1.cell(r, 2).fill = TOTAL_FILL
+            ws1.cell(r, 2).number_format = EUR_FMT
+            ws1.cell(r, 1).border = double_bottom
+            ws1.cell(r, 2).border = double_bottom
+        else:
+            ws1.cell(r, 2).number_format = EUR_FMT
+        r += 1
+
+    # Ausgaben block (one blank row gap)
+    ausgaben_header_row = r + 1
+    ws1.cell(ausgaben_header_row, 1, "AUSGABEN").font = Font(bold=True, size=11, name="Calibri")
+
+    ausgaben_rows = [
+        ("Position", "Betrag (€)"),
+        ("Personalaufwand Festangestellte", 682_000),
+        ("Honorare Kursleiter", 198_400),
+        ("Raum / Betrieb (Miete, Nebenkosten, Instandhaltung)", 198_400),
+        ("Programm / Material (Werkstoffe, Ausstellungskosten)", 99_200),
+        ("Verwaltung / Öffentlichkeitsarbeit", 62_000),
+        ("Summe Ausgaben", 1_240_000),
+    ]
+
+    r = ausgaben_header_row + 1
+    for i, (pos, val) in enumerate(ausgaben_rows):
+        ws1.cell(r, 1, pos)
+        ws1.cell(r, 2, val if isinstance(val, int) else val)
+        if i == 0:
+            ws1.cell(r, 1).font = HEADER_FONT
+            ws1.cell(r, 1).fill = HEADER_FILL
+            ws1.cell(r, 2).font = HEADER_FONT
+            ws1.cell(r, 2).fill = HEADER_FILL
+        elif pos.startswith("Summe"):
+            ws1.cell(r, 1).font = TOTAL_FONT
+            ws1.cell(r, 1).fill = TOTAL_FILL
+            ws1.cell(r, 2).font = TOTAL_FONT
+            ws1.cell(r, 2).fill = TOTAL_FILL
+            ws1.cell(r, 2).number_format = EUR_FMT
+            ws1.cell(r, 1).border = double_bottom
+            ws1.cell(r, 2).border = double_bottom
+        else:
+            ws1.cell(r, 2).number_format = EUR_FMT
+        r += 1
+
+    # Jahresergebnis row
+    r += 1
+    ws1.cell(r, 1, "Jahresergebnis").font = Font(bold=True, name="Calibri")
+    ws1.cell(r, 2, 0).number_format = EUR_FMT
+    ws1.cell(r, 2).font = Font(bold=True, name="Calibri")
+
+    r += 1
+    ws1.cell(r, 1, (
+        "Hinweis: Rücklage gemäß Satzungsklausel-7 wird aus Programm/Material-Überschüssen "
+        "gebildet (Beschluss EV-10, 10.12.2025). Jahresergebnis 0 € — gemeinnützig."
+    ))
+    ws1.cell(r, 1).font = Font(italic=True, color="CC0000", name="Calibri")
+
+    col_width(ws1, 1, 60)
+    col_width(ws1, 2, 18)
+
+    # ── Sheet 2: Förderübersicht ──────────────────────────────────────────
+    ws2 = wb.create_sheet("Förderübersicht")
+
+    ws2["A1"] = "Kunstakademie Rheintal e. V. — Förderübersicht 2025"
+    ws2["A1"].font = Font(bold=True, size=13, name="Calibri")
+    ws2["A2"] = (
+        "Verantwortlich: PER-011 Urte Hamann (Förderanträge / Drittmittel) | "
+        "Verwendungsnachweis-Frist je Geldgeber beachten."
+    )
+    ws2["A2"].font = Font(italic=True, name="Calibri")
+
+    foerd_headers = ["Geldgeber", "Art", "Betrag (€)", "Verwendungszweck",
+                     "Verwendungsnachweis-Frist", "Status"]
+    foerd_data = [
+        ("Land Baden-Württemberg", "Institutionelle Förderung", 228_000,
+         "Laufender Betrieb, Personalkosten", "31.01.2026", "Bescheid EV-05"),
+        ("Stadt Freiburg im Breisgau", "Projektförderung Kulturprogramm", 96_400,
+         "Ausstellungen, Bildungsprojekte", "30.06.2026", "Bewilligt"),
+        ("Stiftung Kulturraum Süd", "Projektgebundene Mittel", 60_000,
+         "Druckgrafik-Residenz (EV-01 / EV-07)", "30.06.2026", "Projektgebunden"),
+        ("Stiftung Bildungsbrücke", "Projektgebundene Mittel", 51_600,
+         "Fotografie-Reihe Außenatelier", "30.09.2026", "Projektgebunden"),
+    ]
+
+    header_row = ws2[4]
+    for col_idx, h in enumerate(foerd_headers, start=1):
+        cell = ws2.cell(4, col_idx, h)
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.alignment = Alignment(horizontal="center")
+
+    for r_idx, row_data in enumerate(foerd_data, start=5):
+        geldgeber, art, betrag, zweck, frist, status = row_data
+        ws2.cell(r_idx, 1, geldgeber)
+        ws2.cell(r_idx, 2, art)
+        ws2.cell(r_idx, 3, betrag).number_format = EUR_FMT
+        ws2.cell(r_idx, 4, zweck)
+        ws2.cell(r_idx, 5, frist)
+        ws2.cell(r_idx, 6, status)
+        for c in range(1, 7):
+            ws2.cell(r_idx, c).font = NORMAL_FONT
+
+    # Summe row
+    summe_r = 5 + len(foerd_data)
+    ws2.cell(summe_r, 1, "Summe Förderung").font = TOTAL_FONT
+    ws2.cell(summe_r, 1).fill = TOTAL_FILL
+    ws2.cell(summe_r, 3, 436_000).number_format = EUR_FMT
+    ws2.cell(summe_r, 3).font = TOTAL_FONT
+    ws2.cell(summe_r, 3).fill = TOTAL_FILL
+
+    # Note about Verwendungsnachweis-Frist
+    note_r = summe_r + 2
+    ws2.cell(note_r, 1, (
+        "Hinweis: Die Verwendungsnachweis-Frist ist für jeden Fördergeber verbindlich. "
+        "Verspätete Einreichungen führen zu Rückforderungen. Koordination: PER-011 Urte Hamann."
+    ))
+    ws2.cell(note_r, 1).font = Font(italic=True, name="Calibri")
+
+    col_width(ws2, 1, 32)
+    col_width(ws2, 2, 28)
+    col_width(ws2, 3, 16)
+    col_width(ws2, 4, 36)
+    col_width(ws2, 5, 24)
+    col_width(ws2, 6, 20)
+
+    # ── Sheet 3: Honorarübersicht ─────────────────────────────────────────
+    ws3 = wb.create_sheet("Honorarübersicht")
+
+    ws3["A1"] = "Honorarübersicht 2025 — Kursleiter KL-01 … KL-34"
+    ws3["A1"].font = Font(bold=True, size=13, name="Calibri")
+    ws3["A2"] = "Verantwortlich: PER-005 Tobias Schipper | Summe Gesamthonorar: 198.400 €"
+    ws3["A2"].font = Font(italic=True, name="Calibri")
+
+    hon_headers = ["KursleiterID", "Name", "Fachbereich",
+                   "Anzahl_Kurse_2025", "Stunden_2025",
+                   "Honorar_Stundensatz", "Gesamthonorar_2025"]
+    for col_idx, h in enumerate(hon_headers, start=1):
+        cell = ws3.cell(4, col_idx, h)
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.alignment = Alignment(horizontal="center")
+
+    # All 34 KL rows from RHEINTAL.md section 4 — Gesamthonorar sums to exactly 198.400 €.
+    # Hours per KL: 4-course KL = 120 h (KL-01), 3-course KL = 120 h,
+    # 2-course KL = 80 h, 1-course KL = 40 h.
+    # KL-01 carries 120 h (not 160) to balance the total precisely.
+    kl_rows = [
+        # fmt: (ID, Name, Fachbereich, Anzahl_Kurse, Stunden, Satz, Gesamt)
+        ("KL-01", "Prof. Anita Gruber",        "Druckgrafik",     4, 120, 85, 10200),
+        ("KL-02", "Berthold Schantz",           "Ölmalerei",       3, 120, 75,  9000),
+        ("KL-03", "Ingeborg Zellner",           "Aquarell",        3, 120, 70,  8400),
+        ("KL-04", "Pavlos Demetriou",           "Fotografie",      3, 120, 80,  9600),
+        ("KL-05", "Susanne Wältermann",         "Skulptur",        2,  80, 90,  7200),
+        ("KL-06", "Florian Neugebauer",         "Digitale Medien", 3, 120, 80,  9600),
+        ("KL-07", "Marta Szymańska",            "Mixed Media",     3, 120, 65,  7800),
+        ("KL-08", "Roland Kleiber",             "Ölmalerei",       2,  80, 75,  6000),
+        ("KL-09", "Yuki Tanigawa",              "Aquarell",        2,  80, 60,  4800),
+        ("KL-10", "Dominic Faure",              "Kunstgeschichte", 2,  80, 70,  5600),
+        ("KL-11", "Claudia Rennert",            "Aktzeichnen",     2,  80, 65,  5200),
+        ("KL-12", "Sebastian Borck",            "Druckgrafik",     2,  80, 80,  6400),
+        ("KL-13", "Margarete Füsslin",          "Keramik",         3, 120, 70,  8400),
+        ("KL-14", "Hanno Winkelmann",           "Musikproduktion", 2,  80, 85,  6800),
+        ("KL-15", "Antje Steudel",              "Skulptur",        2,  80, 90,  7200),
+        ("KL-16", "Georgios Papadimitriou",     "Fotografie",      2,  80, 75,  6000),
+        ("KL-17", "Nina Schwarzbach",           "Mixed Media",     2,  80, 65,  5200),
+        ("KL-18", "Tanja Urbach",               "Ölmalerei",       2,  80, 70,  5600),
+        ("KL-19", "Dieter Fleckenstein",        "Aktzeichnen",     2,  80, 60,  4800),
+        ("KL-20", "Maria Kovács",               "Aquarell",        2,  80, 65,  5200),
+        ("KL-21", "Andreas Langwald",           "Kunstgeschichte", 2,  80, 70,  5600),
+        ("KL-22", "Veronika Söllner",           "Keramik",         2,  80, 75,  6000),
+        ("KL-23", "Raphael Drouet",             "Druckgrafik",     2,  80, 80,  6400),
+        ("KL-24", "Brigitte Unterweger",        "Mixed Media",     2,  80, 65,  5200),
+        ("KL-25", "Thomas Hirtreiter",          "Digitale Medien", 2,  80, 80,  6400),
+        ("KL-26", "Leila Moussavi",             "Musikproduktion", 2,  80, 85,  6800),
+        ("KL-27", "Jan Overwien",               "Skulptur",        1,  40, 90,  3600),
+        ("KL-28", "Silvia Pfanner",             "Ölmalerei",       1,  40, 70,  2800),
+        ("KL-29", "Konrad Autenrieth",          "Aquarell",        1,  40, 60,  2400),
+        ("KL-30", "Fatima Boussouf",            "Fotografie",      1,  40, 75,  3000),
+        ("KL-31", "Erika Lindström",            "Kunstgeschichte", 1,  40, 70,  2800),
+        ("KL-32", "Cyril Magnin",               "Aktzeichnen",     1,  40, 65,  2600),
+        ("KL-33", "Özlem Demir",                "Keramik",         1,  40, 70,  2800),
+        ("KL-34", "Patrick Sauerwein",          "Digitale Medien", 1,  40, 75,  3000),
+    ]
+
+    for r_idx, row_data in enumerate(kl_rows, start=5):
+        kl_id, name, fach, kurse, stunden, satz, gesamt = row_data
+        ws3.cell(r_idx, 1, kl_id)
+        ws3.cell(r_idx, 2, name)
+        ws3.cell(r_idx, 3, fach)
+        ws3.cell(r_idx, 4, kurse)
+        ws3.cell(r_idx, 5, stunden)
+        ws3.cell(r_idx, 6, satz).number_format = EUR_FMT
+        ws3.cell(r_idx, 7, gesamt).number_format = EUR_FMT
+
+    # Summe row
+    summe_kl_r = 5 + len(kl_rows)
+    ws3.cell(summe_kl_r, 1, "Summe").font = TOTAL_FONT
+    ws3.cell(summe_kl_r, 1).fill = TOTAL_FILL
+    ws3.cell(summe_kl_r, 7, 198_400).number_format = EUR_FMT
+    ws3.cell(summe_kl_r, 7).font = TOTAL_FONT
+    ws3.cell(summe_kl_r, 7).fill = TOTAL_FILL
+
+    col_width(ws3, 1, 12)
+    col_width(ws3, 2, 28)
+    col_width(ws3, 3, 20)
+    col_width(ws3, 4, 18)
+    col_width(ws3, 5, 14)
+    col_width(ws3, 6, 22)
+    col_width(ws3, 7, 22)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(str(out_path))
+
+
+# ---------------------------------------------------------------------------
+# 4. kursbelegung_legacy.xls
+# ---------------------------------------------------------------------------
+
+def build_kursbelegung_legacy(out_path: Path) -> None:
+    """Legacy-Export Kursbelegungsdaten 2018–2022 im BIFF8 .xls Format via xlwt.
+
+    Single sheet 'Kursbelegung_alt'. Flat raw export style — minimal styling.
+    BM25 target term: Trimesterauslastungsindex (appears in a hint row at the top).
+    Covers KL-01 (Druckgrafik), KL-03 (Keramik), KL-04 (Schwarz-Weiß-Fotografie).
+    Trailing comment row references Buchungssystem v2.4 (Stand 31.12.2022).
+    """
+    import xlwt
+
+    wb = xlwt.Workbook(encoding="utf-8")
+    ws = wb.add_sheet("Kursbelegung_alt")
+
+    bold = xlwt.easyxf("font: bold on")
+    normal = xlwt.easyxf()
+
+    ws.col(0).width = 5500
+    ws.col(1).width = 9000
+    ws.col(2).width = 4000
+    ws.col(3).width = 7000
+    ws.col(4).width = 4000
+    ws.col(5).width = 3000
+    ws.col(6).width = 5000
+    ws.col(7).width = 5000
+    ws.col(8).width = 7000
+
+    # Hint row containing Trimesterauslastungsindex (BM25 target term)
+    ws.write(0, 0, (
+        "Hinweis: Trimesterauslastungsindex je Kurs als (Belegt/Max)*100 — "
+        "Export Buchungssystem v2.4, Stand 31.12.2022"
+    ), normal)
+
+    # Column header row
+    headers = [
+        "KURS_ID", "KURSNAME", "LEITER_ID", "LEITER_NAME",
+        "TRIMESTER", "JAHR", "TEILNEHMER_BELEGT", "TEILNEHMER_MAX",
+        "AUSLASTUNG_PROZENT",
+    ]
+    for col_idx, h in enumerate(headers):
+        ws.write(1, col_idx, h, bold)
+
+    # Historical data 2018–2022
+    # KL-01 = Druckgrafik (Prof. Gruber), KL-03 = Keramik (Ingeborg Zellner),
+    # KL-04 = Schwarz-Weiß-Fotografie (Pavlos Demetriou in legacy)
+    legacy_data = [
+        # 2018
+        ("LEG-2018-T1-001", "Radierung Grundkurs",          "KL-01", "A.Gruber",    "T1", 2018, 10, 12, 83),
+        ("LEG-2018-T1-002", "Keramik Einführung",           "KL-03", "I.Zellner",   "T1", 2018,  8, 10, 80),
+        ("LEG-2018-T1-003", "SW-Fotografie Grundkurs",      "KL-04", "P.Demetriou", "T1", 2018,  9, 10, 90),
+        ("LEG-2018-T2-001", "Hochdruck Linolschnitt",       "KL-01", "A.Gruber",    "T2", 2018,  7, 10, 70),
+        ("LEG-2018-T2-002", "Töpfern für Anfänger",         "KL-03", "I.Zellner",   "T2", 2018, 10, 12, 83),
+        ("LEG-2018-T3-001", "Radierung Vertiefung",         "KL-01", "A.Gruber",    "T3", 2018,  8, 10, 80),
+        ("LEG-2018-T3-002", "SW-Fotografie Dunkelkammer",   "KL-04", "P.Demetriou", "T3", 2018,  6,  8, 75),
+        # 2019
+        ("LEG-2019-T1-001", "Radierung Grundkurs",          "KL-01", "A.Gruber",    "T1", 2019, 11, 12, 92),
+        ("LEG-2019-T1-002", "Keramik Einführung",           "KL-03", "I.Zellner",   "T1", 2019,  9, 10, 90),
+        ("LEG-2019-T2-001", "Experimentelle Druckgrafik",   "KL-01", "A.Gruber",    "T2", 2019,  6,  8, 75),
+        ("LEG-2019-T2-002", "Raku-Brennen",                 "KL-03", "I.Zellner",   "T2", 2019,  8, 10, 80),
+        ("LEG-2019-T2-003", "SW-Fotografie Grundkurs",      "KL-04", "P.Demetriou", "T2", 2019, 10, 10, 100),
+        ("LEG-2019-T3-001", "Hochdruck Holzschnitt",        "KL-01", "A.Gruber",    "T3", 2019,  8, 10, 80),
+        ("LEG-2019-T3-002", "Keramik Vertiefung",           "KL-03", "I.Zellner",   "T3", 2019,  7, 10, 70),
+        # 2020
+        ("LEG-2020-T1-001", "Radierung Grundkurs",          "KL-01", "A.Gruber",    "T1", 2020,  5, 12, 42),
+        ("LEG-2020-T1-002", "Keramik Einführung",           "KL-03", "I.Zellner",   "T1", 2020,  4, 10, 40),
+        ("LEG-2020-T2-001", "SW-Fotografie Online",         "KL-04", "P.Demetriou", "T2", 2020,  8, 10, 80),
+        ("LEG-2020-T3-001", "Radierung Vertiefung",         "KL-01", "A.Gruber",    "T3", 2020,  9, 12, 75),
+        ("LEG-2020-T3-002", "Keramik Herbst",               "KL-03", "I.Zellner",   "T3", 2020,  7, 10, 70),
+        # 2021
+        ("LEG-2021-T1-001", "Radierung Grundkurs",          "KL-01", "A.Gruber",    "T1", 2021, 12, 12, 100),
+        ("LEG-2021-T1-002", "Keramik Einführung",           "KL-03", "I.Zellner",   "T1", 2021, 10, 10, 100),
+        ("LEG-2021-T2-001", "Linolschnitt Kompakt",         "KL-01", "A.Gruber",    "T2", 2021,  8, 10, 80),
+        ("LEG-2021-T2-002", "SW-Fotografie Porträt",        "KL-04", "P.Demetriou", "T2", 2021,  9, 10, 90),
+        ("LEG-2021-T3-001", "Experimentelle Druckgrafik",   "KL-01", "A.Gruber",    "T3", 2021,  7,  8, 88),
+        ("LEG-2021-T3-002", "Keramik Weihnachten",          "KL-03", "I.Zellner",   "T3", 2021, 10, 12, 83),
+        # 2022
+        ("LEG-2022-T1-001", "Radierung Grundkurs",          "KL-01", "A.Gruber",    "T1", 2022, 12, 12, 100),
+        ("LEG-2022-T1-002", "Keramik Einführung",           "KL-03", "I.Zellner",   "T1", 2022,  9, 10, 90),
+        ("LEG-2022-T2-001", "SW-Fotografie Grundkurs",      "KL-04", "P.Demetriou", "T2", 2022, 10, 10, 100),
+        ("LEG-2022-T2-002", "Hochdruck Holzschnitt",        "KL-01", "A.Gruber",    "T2", 2022,  8, 10, 80),
+        ("LEG-2022-T3-001", "Keramik Vertiefung",           "KL-03", "I.Zellner",   "T3", 2022,  9, 10, 90),
+        ("LEG-2022-T3-002", "Radierung Intensiv",           "KL-01", "A.Gruber",    "T3", 2022, 10, 12, 83),
+        ("LEG-2022-T3-003", "SW-Fotografie Dunkelkammer",   "KL-04", "P.Demetriou", "T3", 2022,  8,  8, 100),
+    ]
+
+    for r_idx, row_data in enumerate(legacy_data, start=2):
+        (kurs_id, kursname, leiter_id, leiter_name,
+         trimester, jahr, belegt, max_tn, auslastung) = row_data
+        ws.write(r_idx, 0, kurs_id, normal)
+        ws.write(r_idx, 1, kursname, normal)
+        ws.write(r_idx, 2, leiter_id, normal)
+        ws.write(r_idx, 3, leiter_name, normal)
+        ws.write(r_idx, 4, trimester, normal)
+        ws.write(r_idx, 5, jahr, normal)
+        ws.write(r_idx, 6, belegt, normal)
+        ws.write(r_idx, 7, max_tn, normal)
+        ws.write(r_idx, 8, auslastung, normal)
+
+    # Trailing comment row
+    trailing_r = 2 + len(legacy_data)
+    ws.write(trailing_r, 0, (
+        "Export: Buchungssystem v2.4 (Stand 31.12.2022, vor Migration auf neues System)"
+    ), normal)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(str(out_path))
+
+
+# ===========================================================================
 # main
 # ===========================================================================
 
@@ -1844,6 +2866,11 @@ def main() -> None:
         (CORPUS_ROOT / "dedup" / "sample.pdf", build_dedup_sample),
         (CORPUS_ROOT / "phash" / "logo_repeating.pdf", build_phash_logo_repeating),
         (CORPUS_ROOT / "multidoc_a" / "appendix.pdf", build_multidoc_appendix),
+        # ── Rheintal corpus ──────────────────────────────────────────────────
+        (CORPUS_ROOT / "rheintal" / "taetigkeitsbericht_2025.pdf", build_taetigkeitsbericht),
+        (CORPUS_ROOT / "rheintal" / "honorarvertrag_gruber.docx", build_honorarvertrag),
+        (CORPUS_ROOT / "rheintal" / "haushaltsplan_2025.xlsx", build_haushaltsplan),
+        (CORPUS_ROOT / "rheintal" / "kursbelegung_legacy.xls", build_kursbelegung_legacy),
     ]
 
     for out_path, builder in outputs:

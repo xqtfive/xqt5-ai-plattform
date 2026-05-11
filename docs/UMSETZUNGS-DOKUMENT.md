@@ -647,9 +647,30 @@
 
 ---
 
+## Phase 3.5 — Filetype-Erweiterung (umgesetzt 2026-05-08/11)
+
+Erweiterung des Upload-Pfads von `pdf/txt/image` auf `pdf/txt/md/csv/docx/xlsx/xls/image`. Architektonisches Muster für alle neuen Extractor-Funktionen in `backend/app/documents.py`:
+
+- **Synchron** (`def _extract_*_text(file_bytes: bytes) -> str`) — keine OCR-Roundtrips für Office-Formate, kein Mistral-API-Call.
+- **Markdown als Zwischendarstellung** — Tabellen werden zu Markdown-Pipe-Tabellen (`_rows_to_md_table`-Helper), Sheet-Namen / Heading-Styles werden zu `#`/`##`-Headings. Damit greift der bestehende `extract_section_path()` ohne Anpassung.
+- **Keine Asset-Extraktion** — `_extract_*_text_and_assets` liefert immer `[]`. Bild-Extraktion aus Office-Dateien kommt erst mit OCR-Pipeline v2 (Docling).
+- **Filetype-Gating zweistufig:** erst die Allowlist `SUPPORTED_UPLOAD_EXTENSIONS` in `main.py:77-81` (HTTP-400 vor Read), dann die Branch-Auswahl in `extract_text()` / `extract_text_and_assets()` in `documents.py:57-106`. Die `_FILE_TYPE_BY_EXT`-Map (`main.py:93-101`) liefert das `file_type`-Label für die DB-Spalte und die Frontend-Icon-Auswahl.
+
+**Legacy-Formate (`.doc`, `.ppt`)** bewusst geschoben — benötigen System-Tool-Subprozesse (`antiword`, `catdoc`) und blähen das Coolify-Image um ~15 MB. **`.pptx`** ebenfalls geschoben weil `python-pptx` Bilder/Group-Shapes/Notes still verwirft — würde RAG-Indizes selbstüberzeugend unvollständig machen. Revisit alle drei bei OCR-Pipeline v2 (Docling liest `.docx/.xlsx/.pptx` mit Layout-Bewusstsein nativ).
+
+## Phase 3.5 — Multi-Datei-Upload mit Concurrency-Semaphore (umgesetzt 2026-05-11)
+
+Frontend-Seite: `<input type="file" multiple>` plus Worker-Pool-Semaphore (`MAX_CONCURRENT = 2`) in `FileUpload.jsx` und `PoolDocuments.jsx`. Pro Datei eigenes State-Tupel `{file, name, status, pct, error}` im lokalen Komponenten-State (nicht App.jsx — der dortige `setError`-Single-Slot hätte vorherige Fehler überschrieben). Backend-Endpunkte unverändert — jede Datei läuft durch die existierende single-file POST-Route.
+
+Begleitender Bugfix in `api.js uploadWithXhr`: 401-Retry mit `tryRefresh()` + einmaligem Retry. War ein pre-existing Fehler (Token-Refresh fehlte für XHR-Uploads), der unter Single-File-Upload selten triggerte, aber bei langen Multi-File-Batches systematisch zuschlug.
+
+## Build-System (umgesetzt 2026-05-11)
+
+`backend/Dockerfile` von hardcoded `pip install`-Liste auf `uv sync --frozen --no-dev --no-install-project` umgestellt. Source-of-Truth-Reihenfolge: `pyproject.toml` deklariert Set + Obergrenzen → `uv.lock` pinnt exakte Versionen mit SHA-256 → Dockerfile installiert ausschließlich aus dem Lockfile. Verhindert dass neue Deps in `pyproject.toml` beim Build still verloren gehen. Siehe `CLAUDE.md` Abschnitt „Build & deploy" und `docs/CODING-DOKUMENT.md` 2026-05-11-Fehlerjournal-Eintrag.
+
 ## Nächste Umsetzungsschritte
 - **Map-Reduce-Zusammenfassung**: Dokument-für-Dokument-Zusammenfassung + Combine-Schritt (baut auf Targeted Retrieval auf)
-- Weitere Dokumentformate: Word (.docx), Excel (.xlsx), PowerPoint (.pptx)
+- **Weitere Dokumentformate**: `.doc`, `.ppt`, `.pptx` — geparkt bis OCR-Pipeline v2 (Docling)
 - Multi-Pool-Retrieval: RAG-Suche über mehrere Pools gleichzeitig
 - Nextcloud/SharePoint-Import
 - Einzeldokument-Fokus im Chat

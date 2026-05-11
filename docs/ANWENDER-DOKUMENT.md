@@ -105,11 +105,16 @@ graph LR
 
 ### 5.4 Dokumente und RAG
 
-- Upload von **PDF**, **TXT** und **Bildern** (`PNG`, `JPG`, `JPEG`, `WEBP`)
+- Upload von **PDF**, **TXT**, **Markdown** (`MD`), **CSV**, **Office** (`DOCX`, `XLSX`, `XLS`) und **Bildern** (`PNG`, `JPG`, `JPEG`, `WEBP`)
+- Mehrere Dateien gleichzeitig auswählbar (max. 2 parallele Uploads; Batches > 20 Dateien lösen einen Hinweis aus, weil das serverseitige Limit bei 20 Uploads pro Minute liegt)
 - Automatische Extraktion:
-  - PDF via OCR
+  - PDF via OCR (Mistral)
   - Bilder via OCR
-  - TXT via UTF-8-Textimport
+  - TXT / MD via UTF-8-Textimport
+  - CSV via Markdown-Tabellen-Konvertierung (Delimiter wird automatisch erkannt)
+  - DOCX via `python-docx` (Absätze + Tabellen, Überschriften werden zu Markdown-Headings)
+  - XLSX via `openpyxl` (pro Sheet eine `## Sheet-Name`-Überschrift + Markdown-Tabelle)
+  - XLS via `xlrd` (Legacy-Format, gleiche Sheet-pro-Tabelle-Logik wie XLSX)
 - Inhalt wird gechunkt, mit Embeddings indexiert und bei passenden Fragen als Kontext zugespielt
 - Hybrid-Suche: Vektorsuche und Volltextsuche (BM25) werden kombiniert für bessere Treffsicherheit
 - **Fortschrittsanzeige beim Hochladen**: Ein Fortschrittsbalken zeigt den Upload-Status an (Datei übertragen → OCR-Verarbeitung)

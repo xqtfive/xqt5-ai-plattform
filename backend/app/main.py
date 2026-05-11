@@ -1032,7 +1032,7 @@ async def upload_document(
         raise HTTPException(status_code=400, detail="No filename provided")
     lower = file.filename.lower()
     if not _is_supported_upload_file(lower):
-        raise HTTPException(status_code=400, detail="Only PDF, TXT, PNG, JPG, JPEG and WEBP files are supported")
+        raise HTTPException(status_code=400, detail="Unterstützte Dateitypen: PDF, TXT, MD, CSV, DOCX, XLSX, XLS, PNG, JPG, JPEG, WEBP")
 
     # Read and validate size
     file_bytes = await file.read()
@@ -1776,7 +1776,7 @@ async def upload_pool_document(
         raise HTTPException(status_code=400, detail="No filename provided")
     lower = file.filename.lower()
     if not _is_supported_upload_file(lower):
-        raise HTTPException(status_code=400, detail="Only PDF, TXT, PNG, JPG, JPEG and WEBP files are supported")
+        raise HTTPException(status_code=400, detail="Unterstützte Dateitypen: PDF, TXT, MD, CSV, DOCX, XLSX, XLS, PNG, JPG, JPEG, WEBP")
 
     file_bytes = await file.read()
     max_bytes = MAX_UPLOAD_SIZE_MB * 1024 * 1024

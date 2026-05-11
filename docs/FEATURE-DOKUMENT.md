@@ -41,9 +41,9 @@ Eine Enterprise-fähige AI-Hub-Plattform mit Multi-LLM-Orchestrierung, zentralem
 5. Template-Picker in Message-Input
 6. Assistenten-Selector in Sidebar + Manager-Modal
 7. Template-Manager-Modal
-### Schritt 2: File Upload + RAG-Pipeline (umgesetzt 2026-02-16)
-1. Datei-Upload (PDF, TXT, PNG, JPG, JPEG, WEBP) pro Chat (API-seitig optional auch ohne Chat-ID)
-2. Text-Extraktion via Mistral OCR API (PDF/Bild) bzw. UTF-8 (TXT)
+### Schritt 2: File Upload + RAG-Pipeline (umgesetzt 2026-02-16, erweitert 2026-05-08/11)
+1. Datei-Upload pro Chat (API-seitig optional auch ohne Chat-ID). Unterstützte Formate: **PDF, TXT, MD, CSV, DOCX, XLSX, XLS, PNG, JPG, JPEG, WEBP**. Seit 2026-05-11 mit Mehrfach-Auswahl und Concurrency=2 auf dem Client. (`.pptx`, `.ppt`, `.doc` sind bewusst geparkt — siehe `docs/tests/phase3/corpus/_shelved/README.md`.)
+2. Text-Extraktion via Mistral OCR API (PDF/Bild), UTF-8 (TXT/MD), stdlib-`csv` (CSV → Markdown-Tabelle), `python-docx` (DOCX), `openpyxl` (XLSX), `xlrd<2.0` (XLS — Legacy-Format-Modul, da xlrd ≥ 2.0 die `.xls`-Unterstützung entfernt hat)
 3. Paragraph-aware Chunking mit konfigurierbarer Größe und Overlap
 4. OpenAI Embeddings (text-embedding-3-small, 1536 Dimensionen)
 5. pgvector HNSW-Index für schnelle Cosine-Similarity-Suche
@@ -83,7 +83,7 @@ Pools sind geteilte Dokumentensammlungen, in denen mehrere Nutzer Dokumente able
 
 ### Kernfeatures
 1. Pool erstellen mit Name, Beschreibung, Icon und Farbe
-2. Dokumente in Pool hochladen (PDF, TXT, PNG, JPG, JPEG, WEBP) — Chunking + Embedding wie bei bestehender RAG-Pipeline
+2. Dokumente in Pool hochladen (PDF, TXT, MD, CSV, DOCX, XLSX, XLS, PNG, JPG, JPEG, WEBP — Mehrfach-Auswahl seit 2026-05-11) — Chunking + Embedding wie bei bestehender RAG-Pipeline
 3. 4-stufiges Berechtigungsmodell: Viewer (lesen + fragen), Editor (+ Dokumente verwalten), Admin (+ Mitglieder verwalten), Owner (implizit, immer Admin)
 4. Mitglieder einladen per Username (Admin+)
 5. Share-Link generieren mit Rolle und optionalem Limit (max Uses, Ablaufdatum)

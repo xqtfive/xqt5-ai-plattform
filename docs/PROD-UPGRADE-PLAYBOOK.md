@@ -289,6 +289,48 @@ Auch nach erfolgreichem Upgrade bleiben einige TODO-Items relevant
 
 ---
 
+## 9. Pre-Deploy-Checkliste (Stand 2026-05-11)
+
+Bevor der nächste Prod-Cutover läuft, diese Punkte abarbeiten und im Playbook abhaken.
+
+### 9a. Migrationsparität dev → prod
+
+**Auf dev verifiziert 2026-05-11 (via Supabase Studio SQL):**
+- `app_documents.content_hash` ✓ vorhanden (A1-Migration `20260506_a_content_hash.sql` applied).
+- `app_document_assets.phash` + `recurring` ✓ vorhanden (A2-Migration `20260506_c_asset_phash_recurring.sql` applied).
+
+**Auf prod: Status unbekannt.** Vor dem Cutover beide SELECTs gegen die Prod-Supabase ausführen:
+```sql
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'app_documents' AND column_name = 'content_hash';
+
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'app_document_assets' AND column_name IN ('phash', 'recurring')
+ORDER BY column_name;
+```
+Liefert die erste SELECT keine Zeile → A1 anwenden. Liefert die zweite SELECT weniger als 2 Zeilen → A2 anwenden. Beide Migrations-Files unter `supabase/migrations/`.
+
+### 9b. Build-Pipeline auf neues Dockerfile umgestellt
+
+Coolify-Backend-App baut seit 2026-05-11 mit `uv sync --frozen --no-dev --no-install-project` aus `backend/uv.lock`. Vor dem Prod-Cutover:
+- Sicherstellen dass `backend/uv.lock` im Repo ist und commit-konsistent mit `backend/pyproject.toml`.
+- Coolify-Cache leeren falls der Build den alten hardcoded-pip-Layer cached. Der erste Build mit dem neuen Dockerfile dauert ~30–60 s länger weil `pip install uv` als neuer Layer hinzukommt.
+- Im laufenden Container nachprüfen: `python -c "import openpyxl, docx, xlrd; print('OK')"`. Wenn das `ModuleNotFoundError` wirft, ist das Image noch auf dem alten Dockerfile.
+
+### 9c. Filetype-Test nach Deploy
+
+Mindestens eine Datei jedes neuen Formats (`.md`, `.csv`, `.docx`, `.xlsx`, `.xls`) hochladen und auf `status='ready'` warten. Backend-Logs auf `Unsupported file type` oder `ModuleNotFoundError` prüfen.
+
+### 9d. Phase-3-Observability-Log
+
+`backend/app/rag.py` enthält ein `phase3=true`-Logging-Statement (Zeilen ~1354–1378), das auf dev für die Verifikationsmatrix gebraucht wird. Vor dem Prod-Cutover entscheiden: (a) auf prod auch behalten (mehr Log-Volume aber gleiche Verifikationsdaten), (b) auf prod auf `DEBUG`-Level downgraden, oder (c) ganz entfernen. Memory `project_xqt5_todo.md` Task #63 trackt die Entfernung als Phase-3.4-Schritt.
+
+### 9e. Versionsobergrenzen in `pyproject.toml`
+
+`pyproject.toml` hat seit 2026-05-11 strikte Obergrenzen für `fastapi<1.0`, `pydantic<3.0`, `supabase<3.0`, und `bcrypt==4.0.1` (exakt — Projektregel). Beim Prod-Deploy darauf achten dass `uv.lock` nicht „mal eben" auf prod neu generiert wird; das Lockfile wird im Repo gepflegt und Coolify nutzt es read-only.
+
+---
+
 ## Notfall-Kontakte / Eskalation
 
 (Hier bei Bedarf eintragen wer im Notfall zuständig ist und wie erreichbar.)

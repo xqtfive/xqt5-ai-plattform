@@ -1,0 +1,35 @@
+KursleiterID,Name,Fachbereich,HonorarStdEUR,AktiveKurse2025,KontaktDomain,Status
+KL-01,Prof. Anita Gruber,Druckgrafik,85,4,kunstakademie-rheintal.de,aktiv
+KL-02,Berthold Schantz,Oelmalerei,75,3,gmx.de,aktiv
+KL-03,Ingeborg Zellner,Aquarell,70,3,kunstakademie-rheintal.de,aktiv
+KL-04,Pavlos Demetriou,Fotografie,80,3,kunstakademie-rheintal.de,aktiv
+KL-05,Susanne Waeltermann,Skulptur,90,2,kunstakademie-rheintal.de,aktiv
+KL-06,Florian Neugebauer,Digitale Medien,80,3,kunstakademie-rheintal.de,aktiv
+KL-07,Marta Szymanska,Mixed Media,65,3,posteo.de,aktiv
+KL-08,Roland Kleiber,Oelmalerei,75,2,web.de,aktiv
+KL-09,Yuki Tanigawa,Aquarell,60,2,gmx.de,aktiv
+KL-10,Dominic Faure,Kunstgeschichte,70,2,posteo.de,aktiv
+KL-11,Claudia Rennert,Aktzeichnen,65,2,gmx.de,aktiv
+KL-12,Sebastian Borck,Druckgrafik,80,2,web.de,aktiv
+KL-13,Margarete Fuesslin,Keramik,70,3,kunstakademie-rheintal.de,aktiv
+KL-14,Hanno Winkelmann,Musikproduktion,85,2,posteo.de,aktiv
+KL-15,Antje Steudel,Skulptur,90,2,gmx.de,aktiv
+KL-16,Georgios Papadimitriou,Fotografie,75,2,web.de,aktiv
+KL-17,Nina Schwarzbach,Mixed Media,65,2,posteo.de,aktiv
+KL-18,Tanja Urbach,Oelmalerei,70,2,gmx.de,aktiv
+KL-19,Dieter Fleckenstein,Aktzeichnen,60,2,web.de,aktiv
+KL-20,Maria Kovacs,Aquarell,65,2,posteo.de,aktiv
+KL-21,Andreas Langwald,Kunstgeschichte,70,2,gmx.de,aktiv
+KL-22,Veronika Soellner,Keramik,75,2,web.de,aktiv
+KL-23,Raphael Drouet,Druckgrafik,80,2,posteo.de,aktiv
+KL-24,Brigitte Unterweger,Mixed Media,65,2,gmx.de,aktiv
+KL-25,Thomas Hirtreiter,Digitale Medien,80,2,web.de,aktiv
+KL-26,Leila Moussavi,Musikproduktion,85,2,posteo.de,aktiv
+KL-27,Jan Overwien,Skulptur,90,1,gmx.de,pausierend
+KL-28,Silvia Pfanner,Oelmalerei,70,1,web.de,pausierend
+KL-29,Konrad Autenrieth,Aquarell,60,1,gmx.de,aktiv
+KL-30,Fatima Boussouf,Fotografie,75,1,posteo.de,aktiv
+KL-31,Erika Lindstroem,Kunstgeschichte,70,1,web.de,auslaufend
+KL-32,Cyril Magnin,Aktzeichnen,65,1,gmx.de,aktiv
+KL-33,Oezlem Demir,Keramik,70,1,posteo.de,aktiv
+KL-34,Patrick Sauerwein,Digitale Medien,75,1,web.de,auslaufend

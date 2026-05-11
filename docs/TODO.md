@@ -170,18 +170,26 @@ Quellen: `kvml_test/` — die Anforderungen sind direkt als Produktverbesserunge
 
 ### Neue Dateiformate & Upload
 
-- [ ] 🟠 **CSV- und Excel-Upload und -Verarbeitung**
-  - Aktuell nur PDF, TXT und Bilddateien unterstützt
-  - `pandas` + `openpyxl` für `.csv`, `.xls`, `.xlsx`-Verarbeitung in `documents.py` hinzufügen
-  - Chunking-Strategie für Tabellendaten: jede Zeile oder logische Zeilengruppe als Chunk; Spaltenüberschriften in jedem Chunk einschließen (gleiches Prinzip wie tabellen-bewusstes Chunking Phase 5.1)
-  - Als Text-Chunks in `app_document_chunks` speichern — kein spezielles Schema nötig
-  - Datei: `documents.py`
+- [x] ✅ **CSV-, MD-, XLSX- und XLS-Upload und -Verarbeitung** — umgesetzt 2026-05-08/11 (siehe `IMPLEMENTIERT.md` Abschnitte „Phase 3.5 — Filetype-Erweiterung" und „`.xls`-Support + Legacy-Fixture")
+  - `_extract_csv_text` (stdlib csv mit Delimiter-Sniffer), `_extract_xlsx_text` (openpyxl, pro Sheet ein `## SheetName` + Markdown-Tabelle), `_extract_xls_text` (xlrd<2.0 für Legacy-BIFF8) in `documents.py`. `.md` als UTF-8-Decode (identisch zu `.txt`).
+  - `pandas` NICHT eingeführt — stdlib + openpyxl reichten aus.
+  - Chunking-Strategie umgesetzt: Markdown-Konvertierung damit der bestehende heading-aware Chunker greift; kein neues Schema.
 
-- [ ] 🟠 **DOCX-Upload und -Verarbeitung**
-  - `.docx`-Dateien sind ein gängiges Geschäftsformat, aktuell nicht unterstützt
-  - `python-docx` verwenden um Absätze, Überschriften, Tabellen (als Markdown), eingebettete Bilder zu extrahieren
-  - Ausgabe in bestehende Chunking-Pipeline einspeisen
-  - Datei: `documents.py`
+- [x] ✅ **DOCX-Upload und -Verarbeitung** — umgesetzt 2026-05-08
+  - `_extract_docx_text` in `documents.py` mit `python-docx`, walkt `doc.iter_inner_content()` in Dokumentenreihenfolge; Heading-Style-Paragraphen werden zu Markdown-Headings, Tabellen zu Markdown-Pipe-Tabellen.
+  - Eingebettete Bilder NICHT extrahiert (warten auf OCR-Pipeline v2 / Docling).
+
+- [ ] 🟢 **`.doc`, `.ppt`, `.pptx`-Upload** — geparkt 2026-05-11
+  - `.doc` und `.ppt` benötigen System-Tool-Subprozesse (`antiword`, `catdoc`) als Nixpkgs-Einträge — ~15 MB Image-Wachstum.
+  - `.pptx` (via `python-pptx`) verwirft Bilder, Group-Shapes, Notes-Slides still — würde RAG-Indizes selbstüberzeugend unvollständig machen.
+  - Test-Fixture `strategieklausur_2025.pptx` ist nach `docs/tests/phase3/corpus/_shelved/` verschoben (mit README).
+  - Revisit: bei OCR-Pipeline v2 / Docling-Adoption (Roadmap-Priorität #6) — Docling liest alle drei mit Layout-Bewusstsein nativ.
+
+- [x] ✅ **Multi-Datei-Upload (Mehrfach-Auswahl mit Concurrency=2)** — umgesetzt 2026-05-11 (siehe `IMPLEMENTIERT.md` Abschnitt „Multi-Datei-Upload mit Concurrency=2 + 401-Retry-Fix")
+  - `<input type="file" multiple>` plus Worker-Pool-Semaphore in `FileUpload.jsx` und `PoolDocuments.jsx`.
+  - Per-Datei-State-Array statt zentralem Error-Slot; Per-Datei-Statusliste in der UI.
+  - Begleitender Bugfix: 401-Retry mit `tryRefresh()` in `uploadWithXhr` — pre-existing Bug, der auch Single-File-Uploads betraf.
+  - Rate-Limit bleibt bei 20/min (User-Entscheidung); Batches > 20 Dateien lösen Warning-Dialog aus.
 
 ### Chat & UX
 

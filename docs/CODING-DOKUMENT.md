@@ -296,3 +296,11 @@ Dieses Dokument hält Coding-Entscheidungen und Fehlerjournal fest, damit Fehler
 
 - **Optionale Deps-Gruppe `[corpus]`.**
   `reportlab` und `xlwt` werden ausschließlich zur Generierung der Test-Fixtures unter `docs/tests/phase3/corpus/` gebraucht (siehe `scripts/build_corpus.py`). Sie landen nicht im Production-Image — `uv sync --no-dev --no-install-project` installiert sie nicht. Wer lokal Fixtures regenerieren will: `uv pip install -e backend[corpus]`.
+
+### 2026-05-11 — RRF-Sortier-Reihenfolge wird ohne Cohere-Rerank zerschossen
+
+- **Fehler: Der Multi-Dok-Bias-Fix vom 2026-05-07 funktioniert nicht im Default-Pfad.**
+  Ursache: `_bm25_search_chunks()` mappt den BM25-Score in das `similarity`-Feld der Chunk-Dicts — dasselbe Feld in dem Vektorhits ihre Cosine-Similarity tragen, aber auf einer komplett anderen Skala (BM25 0–~5,0 vs. Cosine 0–1). `_reciprocal_rank_fusion()` schreibt anschließend einen sauberen `rrf_score`. Aber `_apply_optional_rerank()` sortiert wieder nach `similarity` — was die RRF-Reihenfolge ruiniert, sobald BM25-Hits dabei sind (deren `similarity`-Werte sind nach BM25-Skala kleiner als Vektor-Cosine-Werte und sinken in der Sortierung nach unten, obwohl sie laut RRF oben stehen sollten).
+  Korrektur: Sortier-Key in `rag.py:949` von `-float(c.get("similarity", 0.0))` auf `-float(c.get("rrf_score") or c.get("rerank_score") or c.get("similarity", 0.0) or 0.0)` geändert. RRF gewinnt wenn vorhanden, sonst Rerank-Score, sonst Similarity-Fallback. **Regel: Wenn mehrere Score-Felder verschiedene Skalen tragen, die Sortier-Key explizit das spätere/zusammengeführte Feld bevorzugen lassen. Niemals die Skala-Ambiguität in einem einzelnen Feld dulden.**
+
+- **Lasttragend** weil kein Cohere-Rerank-Key konfiguriert ist (Decision 2026-05-11: no-rerank ist akzeptierte aktuelle Design; siehe Memory `project_xqt5_todo.md`). Ohne Rerank-Stage ist diese Sortierung der einzige Re-Ordering-Mechanismus nach der Hybrid-Retrieval-Fusion. Vor dem Fix wurde RRF im Default-Pfad jedes Mal eingeebnet — der vermeintliche Multi-Dok-Bias-Fix war für den Großteil der echten Anfragen wirkungslos.
