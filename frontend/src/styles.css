@@ -3515,11 +3515,33 @@ body {
   min-width: 0;
 }
 
+.pool-overview-summary-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
 .pool-overview-summary-name {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--color-dark);
   line-height: 1.2;
+}
+
+.pool-overview-summary-counts {
+  font-size: 0.875rem;
+  color: var(--color-text);
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pool-overview-summary-sep {
+  color: var(--color-text-light);
+  user-select: none;
 }
 
 .pool-overview-summary-desc {

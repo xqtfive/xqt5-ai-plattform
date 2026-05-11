@@ -87,16 +87,16 @@ export default function PoolOverview({
         </div>
         <div className="pool-overview-summary">
           <div className="pool-overview-summary-body">
-            <span className="pool-overview-summary-name">
-              {t('pool.overview.summary.name_label')}"{pool.name}"
-            </span>
-            <span className="pool-overview-summary-counts">
-              {safeDocs.length} {t('pool.overview.summary.docs')}
-              {' · '}
-              {safeChats.length} {t('pool.overview.summary.chats_count')}
-              {' · '}
-              {safeMembers.length} {t('pool.overview.summary.members_count')}
-            </span>
+            <div className="pool-overview-summary-line">
+              <span className="pool-overview-summary-name">{pool.name}</span>
+              <span className="pool-overview-summary-counts">
+                {t('pool.overview.summary.docs')}: {safeDocs.length}
+                <span className="pool-overview-summary-sep" aria-hidden="true">·</span>
+                {t('pool.overview.summary.chats_count')}: {safeChats.length}
+                <span className="pool-overview-summary-sep" aria-hidden="true">·</span>
+                {t('pool.overview.summary.members_count')}: {safeMembers.length}
+              </span>
+            </div>
             {pool.description && (
               <p className="pool-overview-summary-desc">{pool.description}</p>
             )}

@@ -20,7 +20,7 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
           <h4 className="pool-chat-section-title">Shared Chats</h4>
           {sharedChats.map((chat) => (
             <div key={chat.id} className="pool-chat-item" onClick={() => onOpenChat(chat.id)}>
-              <span className="pool-chat-icon"><GlobeIcon size={16} /></span>
+              <span className="pool-chat-icon"><GlobeIcon size={18} /></span>
               <div className="pool-chat-info">
                 <span className="pool-chat-name">{chat.title}</span>
                 <span className="pool-chat-meta">{chat.message_count} Nachrichten</span>
@@ -44,7 +44,7 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
           <h4 className="pool-chat-section-title">Meine privaten Chats</h4>
           {privateChats.map((chat) => (
             <div key={chat.id} className="pool-chat-item" onClick={() => onOpenChat(chat.id)}>
-              <span className="pool-chat-icon"><LockIcon size={16} /></span>
+              <span className="pool-chat-icon"><LockIcon size={18} /></span>
               <div className="pool-chat-info">
                 <span className="pool-chat-name">{chat.title}</span>
                 <span className="pool-chat-meta">{chat.message_count} Nachrichten</span>

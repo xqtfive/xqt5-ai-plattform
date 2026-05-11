@@ -42,7 +42,6 @@ const STRINGS = {
     'pool.overview.section.documents': 'Dokumente',
     'pool.overview.section.members': 'Mitglieder',
     'pool.overview.section.summary': 'Übersicht',
-    'pool.overview.summary.name_label': 'Name: ',
     'pool.overview.summary.docs': 'Dokumente',
     'pool.overview.summary.chats_count': 'Chats',
     'pool.overview.summary.members_count': 'Mitglieder',
