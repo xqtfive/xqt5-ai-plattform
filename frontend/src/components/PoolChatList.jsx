@@ -1,4 +1,5 @@
 import { GlobeIcon, LockIcon } from './Icon'
+import { t } from '../i18n/strings'
 
 export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, onDeleteChat }) {
   const sharedChats = chats.filter((c) => c.is_shared)
@@ -8,16 +9,16 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
     <div className="pool-chat-list">
       <div className="pool-chat-create">
         <button className="btn btn-primary btn-small" onClick={() => onCreateChat(true)}>
-          Shared Chat
+          {t('pool.chat.button.shared')}
         </button>
         <button className="btn btn-secondary btn-small" onClick={() => onCreateChat(false)}>
-          Privater Chat
+          {t('pool.chat.button.private')}
         </button>
       </div>
 
       {sharedChats.length > 0 && (
         <div className="pool-chat-section">
-          <h4 className="pool-chat-section-title">Shared Chats</h4>
+          <h4 className="pool-chat-section-title">{t('pool.chat.section.shared')}</h4>
           {sharedChats.map((chat) => (
             <div key={chat.id} className="pool-chat-item" onClick={() => onOpenChat(chat.id)}>
               <span className="pool-chat-icon"><GlobeIcon size={18} /></span>
@@ -41,7 +42,7 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
 
       {privateChats.length > 0 && (
         <div className="pool-chat-section">
-          <h4 className="pool-chat-section-title">Meine privaten Chats</h4>
+          <h4 className="pool-chat-section-title">{t('pool.chat.section.private')}</h4>
           {privateChats.map((chat) => (
             <div key={chat.id} className="pool-chat-item" onClick={() => onOpenChat(chat.id)}>
               <span className="pool-chat-icon"><LockIcon size={18} /></span>
@@ -65,7 +66,7 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
 
       {chats.length === 0 && (
         <div className="pool-empty-state">
-          Noch keine Chats. Erstelle einen Shared oder privaten Chat.
+          {t('pool.chat.empty')}
         </div>
       )}
     </div>

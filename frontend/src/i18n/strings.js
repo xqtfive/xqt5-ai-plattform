@@ -47,6 +47,11 @@ const STRINGS = {
     'pool.overview.summary.members_count': 'Mitglieder',
     'pool.tag.prefix': 'Pool: ',
     'pool.tab.overview': 'Übersicht',
+    'pool.chat.button.shared': 'Geteilter Chat',
+    'pool.chat.button.private': 'Privater Chat',
+    'pool.chat.section.shared': 'Geteilte Chats',
+    'pool.chat.section.private': 'Meine privaten Chats',
+    'pool.chat.empty': 'Noch keine Chats. Erstelle einen geteilten oder privaten Chat.',
 
     'doc.status.processing': 'Wird verarbeitet',
     'doc.status.processing.long':
