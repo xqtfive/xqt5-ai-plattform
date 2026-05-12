@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import CreatePoolDialog from './CreatePoolDialog'
 import { PoolIcon } from './Icon'
+import { t } from '../i18n/strings'
 
 export default function PoolList({ pools, activePoolId, onSelectPool, onCreatePool, onJoinPool }) {
   const [showCreate, setShowCreate] = useState(false)
@@ -70,7 +71,7 @@ export default function PoolList({ pools, activePoolId, onSelectPool, onCreatePo
               <PoolIcon emoji={pool.icon} size={20} className="pool-item-icon" style={{ color: pool.color || '#ee7f00' }} />
               <div className="pool-item-info">
                 <span className="pool-item-name">{pool.name}</span>
-                <span className="pool-item-role">{pool.role}</span>
+                <span className="pool-item-role">{t(`pool.header.role.${pool.role || 'viewer'}`)}</span>
               </div>
             </div>
           ))

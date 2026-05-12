@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api'
 import PoolShareDialog from './PoolShareDialog'
+import { t } from '../i18n/strings'
 
 export default function PoolMembers({ poolId, members, canAdmin, isOwner, currentUserId, onMembersChanged }) {
   const [showInvite, setShowInvite] = useState(false)
@@ -89,7 +90,7 @@ export default function PoolMembers({ poolId, members, canAdmin, isOwner, curren
                 {m.username}
                 {m.id === currentUserId && <span className="pool-member-you"> (Du)</span>}
               </span>
-              <span className={`pool-member-role role-${m.role}`}>{m.role}</span>
+              <span className={`pool-member-role role-${m.role}`}>{t(`pool.header.role.${m.role || 'viewer'}`)}</span>
             </div>
             <div className="pool-member-actions">
               {canAdmin && m.role !== 'owner' && m.id !== currentUserId && (

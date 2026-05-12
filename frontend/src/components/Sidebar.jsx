@@ -208,7 +208,7 @@ export default function Sidebar({
             {activePool.description && (
               <div className="pool-nav-desc">{activePool.description}</div>
             )}
-            <div className="pool-nav-role">{role}</div>
+            <div className="pool-nav-role">{t(`pool.header.role.${role}`)}</div>
           </div>
         </div>
 
@@ -314,7 +314,7 @@ export default function Sidebar({
               <PoolIcon emoji={pool.icon} size={18} className="panel-pool-icon" style={{ color: pool.color || 'var(--color-primary)' }} />
               <div className="panel-item-body">
                 <span className="panel-item-title">{pool.name}</span>
-                <span className="panel-item-sub">{pool.role}</span>
+                <span className="panel-item-sub">{t(`pool.header.role.${pool.role || 'viewer'}`)}</span>
               </div>
             </div>
           ))

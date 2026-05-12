@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
+import { t } from '../i18n/strings'
 
 export default function PoolShareDialog({ poolId, onClose }) {
   const [role, setRole] = useState('viewer')
@@ -118,7 +119,7 @@ export default function PoolShareDialog({ poolId, onClose }) {
               <div key={inv.id} className="pool-invite-item">
                 <div className="pool-invite-info">
                   <code className="pool-invite-token">{inv.token.slice(0, 12)}...</code>
-                  <span className={`pool-member-role role-${inv.role}`}>{inv.role}</span>
+                  <span className={`pool-member-role role-${inv.role}`}>{t(`pool.header.role.${inv.role || 'viewer'}`)}</span>
                   <span className="pool-invite-uses">
                     {inv.use_count}{inv.max_uses ? `/${inv.max_uses}` : ''} genutzt
                   </span>
