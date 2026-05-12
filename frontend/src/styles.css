@@ -475,6 +475,14 @@ body {
   background: rgba(220, 53, 69, 0.08);
 }
 
+.panel-item-icon {
+  flex-shrink: 0;
+  margin-right: 32px;
+  color: var(--color-text-light);
+  display: inline-flex;
+  align-items: center;
+}
+
 .panel-pool-icon {
   font-size: 18px;
   flex-shrink: 0;
@@ -498,6 +506,37 @@ body {
   font-size: 11px;
   color: var(--color-text-light);
   margin-top: 2px;
+}
+
+/* ── Chat-Liste (gemerged): dickere Border + Pool/Personal-Differenzierung ── */
+/* Scoped via .panel-list--chats so the pools-list (plain .panel-list) keeps its
+   current visual treatment. Regular chats: 2px navy at 0.62 alpha, active state
+   fills navy. Pool chats: 2px orange at 0.62, active state fills orange. */
+
+.panel-list--chats .panel-item {
+  border: 2px solid rgba(33, 52, 82, 0.62);
+}
+
+.panel-list--chats .panel-item:hover {
+  border-color: rgba(33, 52, 82, 0.85);
+}
+
+.panel-list--chats .panel-item.active {
+  background: rgba(33, 52, 82, 0.10);
+  border-color: var(--color-dark);
+}
+
+.panel-list--chats .panel-item--pool {
+  border-color: rgba(238, 127, 0, 0.62);
+}
+
+.panel-list--chats .panel-item--pool:hover {
+  border-color: rgba(238, 127, 0, 0.85);
+}
+
+.panel-list--chats .panel-item--pool.active {
+  background: rgba(238, 127, 0, 0.10);
+  border-color: var(--color-primary);
 }
 
 /* Leerzustand */

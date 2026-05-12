@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import CreatePoolDialog from './CreatePoolDialog'
 import UsageWidget from './UsageWidget'
-import { PoolIcon } from './Icon'
+import { PoolIcon, GlobeIcon, LockIcon, ChatBubbleIcon } from './Icon'
 import { t } from '../i18n/strings'
 
 function IconOverview() {
@@ -143,7 +143,7 @@ export default function Sidebar({
           </button>
         </div>
 
-        <div className="panel-list">
+        <div className="panel-list panel-list--chats">
           {(chatItems || []).length === 0 ? (
             <div className="panel-empty">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}>
@@ -179,6 +179,11 @@ export default function Sidebar({
                       </span>
                     )}
                   </div>
+                  <span className="panel-item-icon">
+                    {item.kind === 'pool' && item.is_shared && <GlobeIcon size={16} />}
+                    {item.kind === 'pool' && !item.is_shared && <LockIcon size={16} />}
+                    {item.kind === 'personal' && <ChatBubbleIcon size={16} />}
+                  </span>
                   <button
                     className="panel-item-delete"
                     onClick={(e) => { e.stopPropagation(); onDeleteChatItem(item) }}

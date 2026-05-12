@@ -608,4 +608,35 @@ function handlePoolTabChange(newTab) {
 - Re-Click der Members-Tab hat keinen Sub-View zum Resetten — nichts zu tun.
 - Streaming-Race aus Request-1-Doku weiterhin offen (eigenes Scope).
 
+## Chat-Liste: Pool- vs. Persönlich-Differenzierung verstärkt (2026-05-12)
+
+**Anlass:** In der unifizierten Chats-Seitenleiste wurden persönliche und Pool-Chats bislang nahezu identisch dargestellt. Die Border-Farbe der inaktiven Items lag bei `rgba(33,52,82,0.18)` — ein Grau, das bei typischen Monitoren kaum vom Hintergrund zu unterscheiden war. Noch problematischer: der aktive Zustand verwendete für *alle* Chat-Typen dieselbe Orange-Füllung, sodass ein aktiver persönlicher Chat und ein aktiver Pool-Chat visuell nicht voneinander zu trennen waren. Die Orange-Akzentfarbe ist aber bereits die Marke des Pool-Systems. Nutzer:innen, die zwischen persönlichen Chats und Pool-Chats wechseln, hatten keinen schnellen visuellen Anker, in welchem Kontext sie sich befinden.
+
+**Was sich visuell ändert:**
+
+- *Border-Stärke* aller Chat-Listeneinträge: 1 px → 2 px. Die schwerere Linie macht den Kontur der Items auf kleinen Displays und bei niedrigem Kontrast besser lesbar.
+- *Inaktive persönliche Chats*: Border-Farbe wechselt von `rgba(33,52,82,0.18)` auf `rgba(33,52,82,0.62)` — Navy mit deutlich höherem Alpha, wirkt als klare Abgrenzung statt als Schatten.
+- *Aktiver persönlicher Chat*: statt Orange-Füllung jetzt Navy-Füllung (`rgba(33,52,82,0.10)`) mit durchgehender Navy-Border (`#213452`). Navy steht für „privat/persönlich" — das ist das kognitive Modell, das die Marke schon für die NavRail-Highlights nutzt.
+- *Aktiver Pool-Chat*: bleibt orange, aber leicht angehoben auf `rgba(238,127,0,0.10)` Füllung plus `var(--color-primary)` Border. Orange bleibt die Pool-Sprache.
+
+**Was sich strukturell ändert:**
+
+Jedes Chat-Listenelement bekommt ein neues `.panel-item-icon`-Element auf der rechten Seite der Zeile. Das Icon codiert den Chat-Typ auf einen Blick:
+- Persönlicher Chat → `<ChatBubbleIcon>` (kein Pool-Kontext)
+- Pool-Chat, geteilt (`is_shared: true`) → `<GlobeIcon>` (öffentlicher Pool)
+- Pool-Chat, privat (`is_shared: false`) → `<LockIcon>` (privater Pool)
+
+Das Icon hat `margin-right: 32px`. Die 32 px sind bewusst gewählt: der Löschen-Button (`delete`-Button im Hover-Zustand) ist absolut positioniert auf der rechten Seite jedes `.panel-item`. Bei 20 px würde das Icon unter dem Button verschwinden, sobald der Hover-Zustand das Delete-Control einblendet. 32 px räumen die maximale Ausdehnung des Buttons zuverlässig frei.
+
+Das `is_shared`-Flag fließt vom Backend über `/api/pools/me/chats` (verifiziert in `pool_chats.py:40–46`) ins Frontend; `Sidebar.jsx` liest es aus dem Chat-Objekt.
+
+**CSS-Scoping-Rationale:**
+
+Alle neuen Stile werden über den Parent-Modifier `.panel-list--chats` eingegrenzt, nicht über eine neue Item-Level-Klasse. Konkret: die Chat-Section erhält das `panel-list--chats`-Modifier auf dem umschließenden `div.panel-list`, und alle Regeln lauten `.panel-list--chats .panel-item`, `.panel-list--chats .panel-item.active` usw. Die Pool-Listenansicht (`activeSection === 'pools'`, d. h. das Direktverzeichnis aller Pools, kein Pool-Nav-Modus) nutzt das schlichte `.panel-list` ohne Modifier — Pool-Einträge dort bleiben vollständig unberührt. Der Modifier-Ansatz hält den Base-Kontrakt von `.panel-item` sauber und erlaubt kontextabhängige Überschreibungen ohne Klassen-Multiplikation auf Item-Ebene (Alternativentwurf wäre `.panel-item--chat` gewesen, was aber jede bestehende Render-Stelle hätte anfassen müssen).
+
+**Anti-Scope:**
+- Pool-Listenansicht (`.panel-list` ohne `--chats`-Modifier) bleibt unverändert.
+- Pool-Nav-Modus der Seitenleiste (Pool-Tabs Overview/Dokumente/Chats/Mitglieder) ist nicht betroffen.
+- Icon.jsx: `GlobeIcon`, `LockIcon`, `ChatBubbleIcon` werden als neue Exports ergänzt (Scope der Sibling-Agents); dieses Dokument beschreibt nur die Integration in `Sidebar.jsx`.
+
 Dateien: `frontend/src/App.jsx`, `frontend/src/components/PoolDetail.jsx`

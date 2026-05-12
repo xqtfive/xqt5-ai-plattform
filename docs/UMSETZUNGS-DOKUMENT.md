@@ -718,6 +718,18 @@ Re-Click des aktiven „Chats"-Tabs in der Pool-Nav-Seitenleiste schließt einen
 
 **Bonus-Fix in `handleSelectPool`:** `setActivePoolChatId(null)` ergänzt, um den Stale-Chat-ID-Leak zwischen Pools zu schließen (Pool A → Admin → Pool B könnte vorher Chat-IDs verwechseln, wenn der/die Nutzer:in auf den Chats-Tab klickte).
 
+## Chat-Liste-Differenzierung: Border + Type-Icon (umgesetzt 2026-05-12)
+
+Verstärkte visuelle Trennung zwischen persönlichen Chats und Pool-Chats in der unifizierten Chats-Seitenleiste. Die Änderung besteht aus drei orthogonalen Schichten:
+
+**Border-System:** Item-Border-Stärke von 1 px auf 2 px angehoben. Inaktive persönliche Chats erhalten `rgba(33,52,82,0.62)` als Border-Farbe (vorher `rgba(33,52,82,0.18)`, wahrnehmbar als Grau). Aktive persönliche Chats erhalten Navy-Füllung (`rgba(33,52,82,0.10)`) plus solide Navy-Border — ersetzt die bisherige Orange-Füllung, die für alle aktiven Items galt. Aktive Pool-Chats behalten Orange, leicht angehoben auf `rgba(238,127,0,0.10)` Füllung plus `var(--color-primary)`-Border. Die Differenzierung folgt dem bestehenden Markenmodell: Orange = Pool, Navy = Persönlich.
+
+**Type-Icon:** Neues `.panel-item-icon`-Element pro Zeile, rechts ausgerichtet mit `margin-right: 32px` (genug Abstand, damit der absolut positionierte Hover-Delete-Button nicht überlagert). Icons: `<ChatBubbleIcon>` für persönliche Chats, `<GlobeIcon>` für geteilte Pool-Chats, `<LockIcon>` für private Pool-Chats. Das `is_shared`-Flag kommt aus `/api/pools/me/chats` (Backend `pool_chats.py:40–46`).
+
+**CSS-Scoping:** Alle Regeln sind über den Parent-Modifier `.panel-list--chats` eingegrenzt — die Chat-Section erhält diesen Modifier, alle Selektoren lauten `.panel-list--chats .panel-item[…]`. Die Pool-Listenansicht (kein `--chats`-Modifier) bleibt unberührt. Konvention dokumentiert in `CODING-DOKUMENT.md` (2026-05-12).
+
+Berührte Dateien: `frontend/src/components/Sidebar.jsx`, `frontend/src/styles.css`, `frontend/src/components/Icon.jsx` (neue Icon-Exports).
+
 ## i18n-Drift-Bereinigung (umgesetzt 2026-05-12)
 
 Drei kleine i18n-Patches an Pool-Komponenten beheben englisch-in-deutscher-UI-Regressionen und führen das `t()`-Pattern in fünf weitere Render-Stellen ein.
