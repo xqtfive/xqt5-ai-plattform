@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useConfirm } from './ConfirmDialog'
 
 // Max parallel uploads. The backend rate-limit is 20/min per user; we keep
 // concurrency at 2 so even a 25-file drop trickles through without slamming
@@ -11,6 +12,7 @@ const MAX_CONCURRENT = 2
 const RATE_LIMIT_WARN_THRESHOLD = 20
 
 export default function FileUpload({ chatId, onUploadComplete, disabled }) {
+  const confirm = useConfirm()
   const fileInputRef = useRef(null)
   // Per-file state. Each entry: { file, name, status, pct, error }.
   //   status: 'pending' | 'uploading' | 'done' | 'error'
@@ -24,9 +26,12 @@ export default function FileUpload({ chatId, onUploadComplete, disabled }) {
     if (!selected.length) return
 
     if (selected.length > RATE_LIMIT_WARN_THRESHOLD) {
-      const ok = window.confirm(
-        `Du hast ${selected.length} Dateien ausgewählt. Es sind nur ${RATE_LIMIT_WARN_THRESHOLD} Uploads pro Minute erlaubt — Dateien dahinter erhalten eine Rate-Limit-Fehlermeldung. Trotzdem fortfahren?`
-      )
+      const ok = await confirm({
+        title: 'Rate-Limit-Warnung',
+        message: `Du hast ${selected.length} Dateien ausgewählt. Es sind nur ${RATE_LIMIT_WARN_THRESHOLD} Uploads pro Minute erlaubt — Dateien dahinter erhalten eine Rate-Limit-Fehlermeldung.`,
+        confirmLabel: 'Fortfahren',
+        cancelLabel: 'Abbrechen',
+      })
       if (!ok) {
         if (fileInputRef.current) fileInputRef.current.value = ''
         return
@@ -92,7 +97,7 @@ export default function FileUpload({ chatId, onUploadComplete, disabled }) {
         type="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={disabled || busy}
-        title="Dateien hochladen (PDF, Office, CSV, Markdown, TXT, Bild — mehrere zugleich erlaubt)"
+        title="Dateien hochladen (PDF, Office, CSV, Markdown, TXT, Bild)"
       >
         {busy ? '⏳' : '\u{1F4CE}'}
       </button>

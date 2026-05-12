@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PoolIcon } from './Icon'
+import Modal from './Modal'
 
 const ICONS = ['\u{1F4DA}', '\u{1F4D6}', '\u{1F5C2}', '\u{1F4C1}', '\u{1F680}', '\u{2B50}', '\u{1F4A1}', '\u{1F3AF}']
 const COLORS = ['#ee7f00', '#4CAF50', '#2196F3', '#9C27B0', '#F44336', '#607D8B', '#795548', '#FF9800']
@@ -26,16 +27,10 @@ export default function CreatePoolDialog({ onClose, onCreate }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Pool erstellen</h2>
-          <button className="modal-close" onClick={onClose}>&times;</button>
-        </div>
+    <Modal title="Pool erstellen" onClose={onClose}>
+      {error && <div className="modal-error">{error}</div>}
 
-        {error && <div className="modal-error">{error}</div>}
-
-        <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label>Name</label>
             <input
@@ -93,14 +88,13 @@ export default function CreatePoolDialog({ onClose, onCreate }) {
             </div>
           </div>
 
-          <div className="form-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
-            <button type="submit" className="btn btn-primary" disabled={!name.trim() || saving}>
-              {saving ? 'Erstelle...' : 'Erstellen'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="form-actions">
+          <button type="button" className="btn btn-secondary" onClick={onClose}>Abbrechen</button>
+          <button type="submit" className="btn btn-primary" disabled={!name.trim() || saving}>
+            {saving ? 'Erstelle...' : 'Erstellen'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }

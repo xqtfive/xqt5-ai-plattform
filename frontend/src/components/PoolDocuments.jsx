@@ -2,12 +2,14 @@ import { useRef, useState } from 'react'
 import { api } from '../api'
 import { t } from '../i18n/strings'
 import { FileTypeIcon } from './Icon'
+import { useConfirm } from './ConfirmDialog'
 
 // Same concurrency rules as FileUpload.jsx — see comments there.
 const MAX_CONCURRENT = 2
 const RATE_LIMIT_WARN_THRESHOLD = 20
 
 export default function PoolDocuments({ poolId, documents, canEdit, onUpload, onUploadText, onDelete }) {
+  const confirm = useConfirm()
   const fileInputRef = useRef(null)
   // Per-file upload state for the current/most-recent batch. Each entry:
   //   { file, name, status: 'pending'|'uploading'|'done'|'error', pct: 0-100|-1, error: string|null }
@@ -30,9 +32,12 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
     if (!selected.length) return
 
     if (selected.length > RATE_LIMIT_WARN_THRESHOLD) {
-      const ok = window.confirm(
-        `Du hast ${selected.length} Dateien ausgewählt. Es sind nur ${RATE_LIMIT_WARN_THRESHOLD} Uploads pro Minute erlaubt — Dateien dahinter erhalten eine Rate-Limit-Fehlermeldung. Trotzdem fortfahren?`
-      )
+      const ok = await confirm({
+        title: 'Rate-Limit-Warnung',
+        message: `Du hast ${selected.length} Dateien ausgewählt. Es sind nur ${RATE_LIMIT_WARN_THRESHOLD} Uploads pro Minute erlaubt — Dateien dahinter erhalten eine Rate-Limit-Fehlermeldung.`,
+        confirmLabel: 'Fortfahren',
+        cancelLabel: 'Abbrechen',
+      })
       if (!ok) {
         if (fileInputRef.current) fileInputRef.current.value = ''
         return
@@ -174,7 +179,7 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
           >
             Text einfügen
           </button>
-          <span className="pool-upload-hint">PDF, Office, CSV, Markdown, TXT, Bild — mehrere zugleich</span>
+          <span className="pool-upload-hint">PDF, Office, CSV, Markdown, TXT, Bild</span>
         </div>
       )}
 
@@ -259,10 +264,17 @@ export default function PoolDocuments({ poolId, documents, canEdit, onUpload, on
                 {canEdit && (
                   <button
                     className="pool-doc-delete"
-                    onClick={() => {
-                      if (confirm('Dokument löschen?')) onDelete(doc.id)
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Dokument löschen?',
+                        message: 'Inhalte und Chunks werden unwiderruflich entfernt.',
+                        confirmLabel: 'Löschen',
+                        destructive: true,
+                      })
+                      if (ok) onDelete(doc.id)
                     }}
                     title="Dokument löschen"
+                    aria-label="Dokument löschen"
                   >
                     &times;
                   </button>

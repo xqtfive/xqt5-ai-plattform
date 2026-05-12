@@ -668,6 +668,28 @@ Begleitender Bugfix in `api.js uploadWithXhr`: 401-Retry mit `tryRefresh()` + ei
 
 `backend/Dockerfile` von hardcoded `pip install`-Liste auf `uv sync --frozen --no-dev --no-install-project` umgestellt. Source-of-Truth-Reihenfolge: `pyproject.toml` deklariert Set + Obergrenzen → `uv.lock` pinnt exakte Versionen mit SHA-256 → Dockerfile installiert ausschließlich aus dem Lockfile. Verhindert dass neue Deps in `pyproject.toml` beim Build still verloren gehen. Siehe `CLAUDE.md` Abschnitt „Build & deploy" und `docs/CODING-DOKUMENT.md` 2026-05-11-Fehlerjournal-Eintrag.
 
+## Modal- und ConfirmDialog-Primitiv (umgesetzt 2026-05-12)
+
+Frontend-Architektur-Erweiterung: zwei neue Primitive ersetzen rohes `.modal-overlay`-Markup und alle `window.confirm()`-Aufrufe.
+
+- **`frontend/src/components/Modal.jsx`** — deklarative `<Modal title onClose>`-API mit `role="dialog"` (überschreibbar zu `alertdialog`), `aria-modal="true"`, `aria-labelledby` an Auto-Titel-ID, Esc-Listener, Tab/Shift-Tab-Fokus-Trap, Fokus-Rückkehr beim Unmount, togglebarer Backdrop-Click-Close (`closeOnBackdropClick`-Prop, Default `true`). Fokus-Initialisierung in `useLayoutEffect` schützt Reacts `autoFocus`-Attribut: das Modal greift nur dann zum ersten fokussierbaren Element, wenn der Fokus nicht bereits durch `autoFocus` innen gelandet ist.
+
+- **`frontend/src/components/ConfirmDialog.jsx`** — exportiert `ConfirmProvider` und Hook `useConfirm()`. Der Provider ist in `main.jsx` oberhalb von `<App />` gemountet (außerhalb der Auth-Gate, damit auch Pre-Auth-Flows den Hook nutzen können). Hook-API: `const confirm = useConfirm(); const ok = await confirm({ title, message, confirmLabel, cancelLabel, destructive })`. Default-Fokus liegt auf Cancel; Default-Labels deutsch. `destructive: true` gibt dem Confirm-Button die `btn-danger`-Klasse. Intern: `<Modal role="alertdialog" closeOnBackdropClick={false} size="confirm">`.
+
+- **Retrofit:** `CreatePoolDialog` und `PoolShareDialog` (mit `closeOnBackdropClick={false}`, weil State-Verlust nach Token-Generierung user-feindlich wäre) auf `<Modal>` migriert. `AssistantManager` und `TemplateManager` *nicht* migriert — ihr Zwei-Panel-Layout (List ↔ Edit-Form) passt nicht in eine deklarative Single-Child-API; ihre `confirm()`-Aufrufe wurden trotzdem auf den Hook umgestellt. Alle 15 `window.confirm()`-Aufrufe über 8 Dateien (App.jsx, PoolMembers, PoolChatList, PoolDocuments, FileUpload, AdminDashboard mit 4 Sub-Tabs, AssistantManager, TemplateManager) ersetzt. Inline-Arrow-`onClick`-Handler in `PoolChatList` und `PoolDocuments` zu async-Funktionen umgebaut; `e.stopPropagation()` läuft synchron vor `await confirm(...)`, damit der Parent-Click nicht feuert.
+
+- **CSS:** `.modal-overlay`/`.modal-content`/`.modal-header`/`.modal-close` (styles.css:1352-1410) unverändert — `<Modal>` rendert dieselbe DOM-Struktur. Zwei neue Regeln: `.modal-content--confirm { max-width: 440px }` und `.confirm-message { white-space: pre-line; ... }`.
+
+- **Anti-Scope:** zwei Vorschau-Modale in `PoolDocuments.jsx` (`.pool-preview-modal-backdrop`, `.pool-text-modal`) bleiben ungewandelt (anderes Pattern, fullscreen Datei-Preview). Eine `IconButton`-Primitive für aria-label-Sweep auf alle Icon-only-Buttons ist Folge-Scope.
+
+## i18n-Drift-Bereinigung (umgesetzt 2026-05-12)
+
+Drei kleine i18n-Patches an Pool-Komponenten beheben englisch-in-deutscher-UI-Regressionen und führen das `t()`-Pattern in fünf weitere Render-Stellen ein.
+
+- **`PoolChatList`** — 5 Strings auf neue `pool.chat.*`-Keys umgestellt (`button.shared/private`, `section.shared/private`, `empty`). Namespace `pool.chat.*` bewusst nicht `pool.chatlist.*`, damit die Keys eine künftige Komponentenumbenennung überdauern.
+- **`DocumentList`** — englischer Tooltip `title="Remove document"` → `t('doc.action.delete')` (= `Dokument löschen`, passt zur projektweiten „löschen"-Konvention); englischer Fallback `${chunk_count} chunks` → `${chunk_count} ${t('doc.chunks')}`.
+- **Pool-Rolle-Badge** — `t(\`pool.header.role.${role || 'viewer'}\`)`-Pattern (Fallback gegen `undefined`) jetzt konsistent über `Sidebar.jsx` (2 Stellen), `PoolList.jsx`, `PoolMembers.jsx`, `PoolShareDialog.jsx` ausgerollt. PoolOverview.jsx hatte das Pattern schon; jetzt sieht der/die Nutzer:in überall `Eigentümer:in` / `Administrator:in` / `Bearbeiter:in` / `Betrachter:in` statt rohem `owner`/`admin`/`editor`/`viewer`. **Wichtig:** Das Fallback `|| 'viewer'` ist nicht kosmetisch — ohne ihn würde `t('pool.header.role.undefined')` den Key wörtlich zurückgeben, was als sichtbarer Müll auf der UI auftauchen würde.
+
 ## Nächste Umsetzungsschritte
 - **Map-Reduce-Zusammenfassung**: Dokument-für-Dokument-Zusammenfassung + Combine-Schritt (baut auf Targeted Retrieval auf)
 - **Weitere Dokumentformate**: `.doc`, `.ppt`, `.pptx` — geparkt bis OCR-Pipeline v2 (Docling)

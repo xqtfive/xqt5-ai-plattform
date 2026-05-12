@@ -8,11 +8,13 @@ import AdminDashboard from './components/AdminDashboard'
 import AssistantManager from './components/AssistantManager'
 import TemplateManager from './components/TemplateManager'
 import PoolDetail from './components/PoolDetail'
+import { useConfirm } from './components/ConfirmDialog'
 
 const FALLBACK_MODEL = 'google/gemini-3-pro-preview'
 const DEFAULT_TEMPERATURE = 0.7
 
 export default function App() {
+  const confirm = useConfirm()
   const [user, setUser] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [usage, setUsage] = useState(null)
@@ -317,9 +319,13 @@ export default function App() {
   }
 
   async function handleDeleteChatItem(item) {
-    // Confirm before either kind of deletion — matches pre-Phase-2 UX where
-    // the confirm lived inside Sidebar for personal chats.
-    if (!confirm(item.kind === 'pool' ? 'Pool-Chat löschen?' : 'Konversation löschen?')) return
+    const ok = await confirm({
+      title: item.kind === 'pool' ? 'Pool-Chat löschen?' : 'Konversation löschen?',
+      message: 'Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmLabel: 'Löschen',
+      destructive: true,
+    })
+    if (!ok) return
     if (item.kind === 'personal') {
       return onDeleteConversation(item.id)
     }
@@ -546,7 +552,13 @@ export default function App() {
   }
 
   async function handleDeletePool() {
-    if (!confirm('Pool wirklich löschen? Alle Dokumente und Chats werden gelöscht.')) return
+    const ok = await confirm({
+      title: 'Pool löschen?',
+      message: 'Alle Dokumente und Chats dieses Pools werden unwiderruflich entfernt.',
+      confirmLabel: 'Löschen',
+      destructive: true,
+    })
+    if (!ok) return
     setError('')
     try {
       await api.deletePool(activePool.id)
@@ -559,7 +571,13 @@ export default function App() {
   }
 
   async function handleLeavePool() {
-    if (!confirm('Pool wirklich verlassen?')) return
+    const ok = await confirm({
+      title: 'Pool verlassen?',
+      message: 'Du verlierst den Zugriff auf alle Inhalte dieses Pools.',
+      confirmLabel: 'Verlassen',
+      destructive: true,
+    })
+    if (!ok) return
     setError('')
     try {
       await api.removePoolMember(activePool.id, user.id)

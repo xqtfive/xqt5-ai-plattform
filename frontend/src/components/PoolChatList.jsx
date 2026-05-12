@@ -1,7 +1,21 @@
 import { GlobeIcon, LockIcon } from './Icon'
 import { t } from '../i18n/strings'
+import { useConfirm } from './ConfirmDialog'
 
 export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, onDeleteChat }) {
+  const confirm = useConfirm()
+
+  async function handleDelete(e, chatId) {
+    e.stopPropagation()
+    const ok = await confirm({
+      title: 'Chat löschen?',
+      message: 'Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmLabel: 'Löschen',
+      destructive: true,
+    })
+    if (ok) onDeleteChat(chatId)
+  }
+
   const sharedChats = chats.filter((c) => c.is_shared)
   const privateChats = chats.filter((c) => !c.is_shared)
 
@@ -28,10 +42,8 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
               </div>
               <button
                 className="pool-chat-delete"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (confirm('Chat löschen?')) onDeleteChat(chat.id)
-                }}
+                onClick={(e) => handleDelete(e, chat.id)}
+                aria-label="Chat löschen"
               >
                 &times;
               </button>
@@ -52,10 +64,8 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
               </div>
               <button
                 className="pool-chat-delete"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (confirm('Chat löschen?')) onDeleteChat(chat.id)
-                }}
+                onClick={(e) => handleDelete(e, chat.id)}
+                aria-label="Chat löschen"
               >
                 &times;
               </button>

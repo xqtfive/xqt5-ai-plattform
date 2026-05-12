@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
 import { t } from '../i18n/strings'
+import Modal from './Modal'
 
 export default function PoolShareDialog({ poolId, onClose }) {
   const [role, setRole] = useState('viewer')
@@ -57,16 +58,10 @@ export default function PoolShareDialog({ poolId, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2>Share-Link erstellen</h2>
-          <button className="modal-close" onClick={onClose}>&times;</button>
-        </div>
+    <Modal title="Share-Link erstellen" onClose={onClose} closeOnBackdropClick={false}>
+      {error && <div className="modal-error">{error}</div>}
 
-        {error && <div className="modal-error">{error}</div>}
-
-        <div className="pool-share-create">
+      <div className="pool-share-create">
           <div className="form-row">
             <div className="form-group">
               <label>Rolle</label>
@@ -112,29 +107,28 @@ export default function PoolShareDialog({ poolId, onClose }) {
           </div>
         )}
 
-        {invites.length > 0 && (
-          <div className="pool-share-existing">
-            <h4>Aktive Einladungen</h4>
-            {invites.map((inv) => (
-              <div key={inv.id} className="pool-invite-item">
-                <div className="pool-invite-info">
-                  <code className="pool-invite-token">{inv.token.slice(0, 12)}...</code>
-                  <span className={`pool-member-role role-${inv.role}`}>{t(`pool.header.role.${inv.role || 'viewer'}`)}</span>
-                  <span className="pool-invite-uses">
-                    {inv.use_count}{inv.max_uses ? `/${inv.max_uses}` : ''} genutzt
-                  </span>
-                </div>
-                <button
-                  className="btn btn-danger btn-small"
-                  onClick={() => handleRevoke(inv.id)}
-                >
-                  Widerrufen
-                </button>
+      {invites.length > 0 && (
+        <div className="pool-share-existing">
+          <h4>Aktive Einladungen</h4>
+          {invites.map((inv) => (
+            <div key={inv.id} className="pool-invite-item">
+              <div className="pool-invite-info">
+                <code className="pool-invite-token">{inv.token.slice(0, 12)}...</code>
+                <span className={`pool-member-role role-${inv.role}`}>{t(`pool.header.role.${inv.role || 'viewer'}`)}</span>
+                <span className="pool-invite-uses">
+                  {inv.use_count}{inv.max_uses ? `/${inv.max_uses}` : ''} genutzt
+                </span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+              <button
+                className="btn btn-danger btn-small"
+                onClick={() => handleRevoke(inv.id)}
+              >
+                Widerrufen
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Modal>
   )
 }

@@ -457,3 +457,51 @@ Aufbau eines zweiten, von Musterbau **bewusst disjunkten** Testkorpus, um Vielfa
 **Garantie keine Musterbau-Berührung:** Während der Generierung wurden ausschließlich Dateien unter `corpus/rheintal/` neu angelegt und `scripts/build_corpus.py` modifiziert; `git status` bestätigte dass weder `corpus/musterbau/` noch die anderen Subset-Ordner angefasst wurden.
 
 Dateien: `docs/tests/phase3/corpus/rheintal/RHEINTAL.md` (neu), `docs/tests/phase3/corpus/rheintal/*` (7 Fixtures, neu), `scripts/build_corpus.py`
+
+---
+
+## i18n-Drift-Bereinigung an Pool-Komponenten (2026-05-12)
+
+**Anlass:** UI-Audit fand drei englisch-in-deutscher-UI-Regressionen: `PoolChatList.jsx` mischte "Shared Chats" (englisch) mit "Meine privaten Chats" (deutsch); `DocumentList.jsx` hatte einen englischen Tooltip `title="Remove document"` plus einen englischen Chunk-Count-Fallback `${n} chunks`; `Sidebar.jsx`, `PoolList.jsx`, `PoolMembers.jsx` und `PoolShareDialog.jsx` rendern die Pool-Rolle als rohen Backend-Wert (`viewer`/`editor`/`admin`/`owner`) statt über die existierenden `pool.header.role.*`-i18n-Keys, während `PoolOverview.jsx` bereits korrekt routete — Inkonsistenz für Nutzer:innen, die zwischen Ansichten wechseln.
+
+**Drei separate Commits, drei kleine Patches:**
+
+1. **PoolChatList** — 5 hartkodierte Strings durch 5 neue `pool.chat.*`-Keys ersetzt (`button.shared`, `button.private`, `section.shared`, `section.private`, `empty`). Namespace bewusst auf `pool.chat.*` statt `pool.chatlist.*` gesetzt, damit die Keys nicht an einen Komponentennamen gebunden sind (überdauert Refactorings). Das verbleibende `confirm('Chat löschen?')` blieb für den späteren ConfirmDialog-Refactor.
+
+2. **DocumentList** — `title="Remove document"` → `title={t('doc.action.delete')}` (Wert `Dokument löschen` — passt zu PoolDocuments-Konvention; Codebase nutzt „löschen" für destruktive Aktionen, „entfernen" nur für Mitglieds-Entfernungen aus Pools). Zusätzlich der englische Fallback `${chunk_count} chunks` → `${chunk_count} ${t('doc.chunks')}` mit neuem Key `doc.chunks: 'Chunks'`. Zwei neue Keys, zwei Zeilen Code geändert.
+
+3. **Pool-Rollen-Badge** — `t(\`pool.header.role.${role || 'viewer'}\`)`-Pattern (Fallback gegen `undefined`) in 5 Render-Stellen über 4 Komponenten ausgerollt: `Sidebar.jsx` (zweimal: aktiver Pool-Nav-Identitäts-Block + Pools-Liste), `PoolMembers.jsx`, `PoolList.jsx`, `PoolShareDialog.jsx`. Das Pattern existierte schon in `PoolOverview.jsx`; jetzt überall konsistent. `t`-Import in den 3 Komponenten ergänzt, die ihn noch nicht hatten. Anti-Scope: die `<select>`-Optionslabels (`<option>Viewer/Editor/Admin</option>` in PoolMembers.jsx) bleiben vorerst englisch — separater Folge-PR.
+
+**Workflow-Hinweis:** Jede Änderung wurde vorab durch zwei oder drei parallele Subagent-Reviews (Impact-Scope, kritischer Reviewer, Cross-Component-Sweep) geprüft, bevor der Edit lief. Insbesondere für die Rollen-Badges hat der Cross-Component-Sweep aufgezeigt, dass eine Sidebar-only-Fix die UI patchwork-inkonsistent gemacht hätte — Scope-Erweiterung auf alle 5 Sites war die richtige Wahl.
+
+Dateien: `frontend/src/components/PoolChatList.jsx`, `frontend/src/components/DocumentList.jsx`, `frontend/src/components/Sidebar.jsx`, `frontend/src/components/PoolList.jsx`, `frontend/src/components/PoolMembers.jsx`, `frontend/src/components/PoolShareDialog.jsx`, `frontend/src/i18n/strings.js` (+7 Keys: 5 `pool.chat.*`, 2 `doc.*`)
+
+---
+
+## Geteilte Modal- und ConfirmDialog-Primitiven (2026-05-12)
+
+**Anlass:** UI-Audit fand zwei zusammengehörige Mängel: (1) vier Modal-Komponenten (`CreatePoolDialog`, `PoolShareDialog`, `AssistantManager`, `TemplateManager`) verwendeten rohes `.modal-overlay`-Markup ohne A11y-Attribute (`role="dialog"`, `aria-modal`, Fokus-Trap, Esc-Handler, Fokus-Rückkehr beim Schließen). (2) 15 Aufrufe von `window.confirm()` über 8 Dateien lieferten den nativen Browser-Dialog statt eines styled Modals, optisch fremd zum XQT5-Designsystem. Beide Probleme teilen sich dieselbe Lösung — ein geteiltes Modal-Primitiv —, daher wurden sie in einem Commit gebündelt.
+
+**Architektur — zwei neue Komponenten unter `frontend/src/components/`:**
+
+- **`Modal.jsx`** — deklarative Children-API. Props: `onClose`, `title`, `children`, `role` (Default `dialog`, ConfirmDialog überschreibt mit `alertdialog`), `labelledBy`, `describedBy`, `size` (Passthrough-Klasse, z. B. `confirm` für schmalere Confirm-Boxen), `closeOnBackdropClick` (Default `true`; auf `false` für State-erhaltende Dialoge wie PoolShareDialog gesetzt), `className`. Implementiert: `aria-modal="true"`, `aria-labelledby` an auto-generierte Titel-ID, Esc-Key-Listener, Tab/Shift-Tab-Fokus-Trap zwischen erstem und letztem fokussierbaren Innen-Element, Fokus-Rückkehr zum ursprünglichen Trigger beim Unmount, Backdrop-Click-Schließen (per Prop togglebar), Klick auf Modal-Content stoppt die Propagation. Fokus-Initialisierung läuft in `useLayoutEffect` — prüft zuerst, ob `document.activeElement` bereits im Modal liegt (autoFocus auf z. B. den Name-Input in `CreatePoolDialog` hat dann schon gewonnen) und greift sonst zum ersten fokussierbaren Element. Damit fight nichts mit Reacts autoFocus-Attribut.
+
+- **`ConfirmDialog.jsx`** — exportiert `ConfirmProvider` und Hook `useConfirm()`. Provider mountet in `main.jsx` *oberhalb* von `<App />` — also außerhalb der Auth-Gate, damit auch eine spätere Dialog-Verwendung in `LoginScreen` funktioniert. Der Hook liefert eine async-Funktion: `const ok = await confirm({ title, message, confirmLabel, cancelLabel, destructive })`. Default-Labels deutsch (`Bestätigen` / `Abbrechen`). Bei `destructive: true` bekommt der Confirm-Button die `btn-danger`-Klasse. Default-Fokus liegt auf dem **Cancel**-Button (sicherer Default für destruktive Aktionen). Intern wird `<Modal role="alertdialog" closeOnBackdropClick={false} size="confirm">` gerendert.
+
+**Retrofit-Scope: 2 von 4 Modalen + alle 15 `confirm()`-Aufrufe.**
+
+- **`CreatePoolDialog` und `PoolShareDialog`** auf `<Modal>` migriert. `PoolShareDialog` bekam `closeOnBackdropClick={false}`, weil ein versehentlicher Backdrop-Klick nach dem Erzeugen eines Einladungs-Tokens (mit Copy-to-Clipboard-Button) den frisch erzeugten Token wegwerfen würde — user-feindlich.
+- **`AssistantManager` und `TemplateManager`** bewusst **nicht** migriert. Beide haben ein Zwei-Panel-Layout (Listenansicht ↔ Edit-Form) mit eigener Mode-switchender Header-Logik, das nicht in eine `<Modal title="...">`-Single-Child-API passt. Erzwungene Migration hätte den State-Machine-Layer durch den Modal-Wrapper hindurch zerflust. Die nicht-migrierten Modale behalten ihr `.modal-overlay`-Markup; ihre `confirm()`-Aufrufe (`Assistent löschen?`, `Vorlage löschen?`) wurden trotzdem auf den Hook umgestellt.
+- **Alle 15 `confirm()`-Sites** ersetzt: `App.jsx` (3), `PoolMembers.jsx` (1), `PoolChatList.jsx` (2 inline Arrow-Handler in `<button onClick>` zu einem `handleDelete(e, chatId)` zusammengezogen, weil identische Logik), `PoolDocuments.jsx` (2 inkl. Rate-Limit-Warnung), `FileUpload.jsx` (1 Rate-Limit-Warnung), `AdminDashboard.jsx` (4 — `UsersTab.handleDelete`, `RetrievalTab.handleRechunk`, `ModelsTab.handleDelete`, `ProvidersTab.handleDelete`; jede Sub-Tab-Komponente ruft `useConfirm()` separat statt Prop-Drill), `AssistantManager.jsx` (1), `TemplateManager.jsx` (1). Pro Site wurde der Prompt-String in `title` + `message` aufgeteilt und ein passender `confirmLabel` (`Löschen` / `Entfernen` / `Deaktivieren` / `Verlassen` / `Fortfahren`) gewählt. Drei Aufrufe sind nicht-destruktiv und nutzen `destructive: false`: Pool-Verlassen, Admin-Rechunk-Trigger, Rate-Limit-Warnungen bei Upload-Batches.
+
+**Was bewusst draußen blieb:**
+- Die zwei Vorschau-Modale in `PoolDocuments.jsx` (`.pool-preview-modal-backdrop`, `.pool-text-modal`) — anderes CSS-Pattern (fullscreen Datei-Preview vs. Form-Dialog), separates Scope.
+- Eine `IconButton`-Primitive für alle Icon-only-Buttons (aria-label-Sweep) — separates Scope.
+- Die `<select><option>Viewer/Editor/Admin</option>`-Labels in `PoolMembers.jsx:102-104` — separater i18n-Folge-PR.
+
+**CSS:** Bestehende `.modal-overlay`/`.modal-content`/`.modal-header`/`.modal-close`-Regeln (`styles.css:1352-1410`) wurden nicht angefasst — `Modal.jsx` rendert exakt dieselbe DOM-Struktur. Nur zwei kleine neue Regeln ergänzt: `.modal-content--confirm { max-width: 440px }` (schmalere Confirm-Box) und `.confirm-message { ... white-space: pre-line }` (für mehrzeilige Confirm-Messages wie der Rechunk-Warnung mit `\n`).
+
+**A11y-Wirkung:** Tab-Fokus zirkuliert nicht mehr ins darunterliegende Hauptfenster, Esc schließt jedes Modal, Fokus kehrt nach dem Schließen zum Trigger-Element zurück, Screenreader bekommen `role="dialog"`/`role="alertdialog"` + Titel-Aria-Label. Native `window.confirm()` ist eliminiert — der Browser-Dialog war bisher die einzige Stelle in der UI ohne XQT5-Branding.
+
+Dateien (neu): `frontend/src/components/Modal.jsx`, `frontend/src/components/ConfirmDialog.jsx`
+Dateien (geändert): `frontend/src/main.jsx` (ConfirmProvider-Mount), `frontend/src/App.jsx`, `frontend/src/components/CreatePoolDialog.jsx`, `frontend/src/components/PoolShareDialog.jsx`, `frontend/src/components/AssistantManager.jsx`, `frontend/src/components/TemplateManager.jsx`, `frontend/src/components/AdminDashboard.jsx`, `frontend/src/components/PoolMembers.jsx`, `frontend/src/components/PoolChatList.jsx`, `frontend/src/components/PoolDocuments.jsx`, `frontend/src/components/FileUpload.jsx`, `frontend/src/styles.css` (+10 Zeilen CSS)

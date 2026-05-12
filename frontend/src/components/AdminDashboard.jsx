@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { t } from '../i18n/strings'
+import { useConfirm } from './ConfirmDialog'
 
 const TABS = [
   { id: 'users', label: 'Benutzer' },
@@ -50,6 +51,7 @@ export default function AdminDashboard({ onClose, currentUser }) {
 }
 
 function UsersTab({ currentUser }) {
+  const confirm = useConfirm()
   const [users, setUsers] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -81,7 +83,13 @@ function UsersTab({ currentUser }) {
   }
 
   async function handleDelete(userId, username) {
-    if (!confirm(`Benutzer "${username}" wirklich löschen (deaktivieren)?`)) return
+    const ok = await confirm({
+      title: 'Benutzer deaktivieren?',
+      message: `Der Benutzer "${username}" wird deaktiviert und kann sich nicht mehr anmelden.`,
+      confirmLabel: 'Deaktivieren',
+      destructive: true,
+    })
+    if (!ok) return
     setError('')
     try {
       await api.adminDeleteUser(userId)
@@ -396,6 +404,7 @@ function StatsTab() {
 }
 
 function RetrievalTab() {
+  const confirm = useConfirm()
   const [settings, setSettings] = useState(null)
   const [form, setForm] = useState({
     rerank_enabled: false,
@@ -443,11 +452,15 @@ function RetrievalTab() {
   }
 
   async function handleRechunk() {
-    if (!window.confirm(
-      'Alle bestehenden Chunks werden gelöscht und neu generiert.\n' +
-      'Das kann je nach Dokumentanzahl mehrere Minuten dauern und verursacht OpenAI-Embedding-Kosten.\n\n' +
-      'Fortfahren?'
-    )) return
+    const ok = await confirm({
+      title: 'Chunks neu generieren?',
+      message:
+        'Alle bestehenden Chunks werden gelöscht und neu generiert.\n' +
+        'Das kann je nach Dokumentanzahl mehrere Minuten dauern und verursacht OpenAI-Embedding-Kosten.',
+      confirmLabel: 'Fortfahren',
+      cancelLabel: 'Abbrechen',
+    })
+    if (!ok) return
     try {
       await api.adminRechunkDocuments()
       setRechunkStatus({ state: 'running', progress: { done: 0, total: 0 } })
@@ -722,6 +735,7 @@ function RetrievalTab() {
 }
 
 function ModelsTab() {
+  const confirm = useConfirm()
   const [models, setModels] = useState([])
   const [providers, setProviders] = useState([])
   const [error, setError] = useState('')
@@ -797,7 +811,13 @@ function ModelsTab() {
   }
 
   async function handleDelete(id) {
-    if (!confirm('Modell wirklich löschen?')) return
+    const ok = await confirm({
+      title: 'Modell löschen?',
+      message: 'Dieses Modell steht danach nicht mehr zur Auswahl.',
+      confirmLabel: 'Löschen',
+      destructive: true,
+    })
+    if (!ok) return
     setError('')
     try {
       await api.adminDeleteModel(id)
@@ -944,6 +964,7 @@ function ModelsTab() {
 }
 
 function ProvidersTab() {
+  const confirm = useConfirm()
   const [providers, setProviders] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -997,7 +1018,13 @@ function ProvidersTab() {
   }
 
   async function handleDelete(provider) {
-    if (!confirm(`API-Key für ${provider} wirklich deaktivieren?`)) return
+    const ok = await confirm({
+      title: 'API-Key deaktivieren?',
+      message: `Der API-Key für ${provider} wird deaktiviert. Modelle dieses Providers stehen danach nicht mehr zur Verfügung.`,
+      confirmLabel: 'Deaktivieren',
+      destructive: true,
+    })
+    if (!ok) return
     setError('')
     setTestResults((r) => ({ ...r, [provider]: null }))
     try {

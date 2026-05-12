@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { api } from '../api'
 import PoolShareDialog from './PoolShareDialog'
 import { t } from '../i18n/strings'
+import { useConfirm } from './ConfirmDialog'
 
 export default function PoolMembers({ poolId, members, canAdmin, isOwner, currentUserId, onMembersChanged }) {
+  const confirm = useConfirm()
   const [showInvite, setShowInvite] = useState(false)
   const [username, setUsername] = useState('')
   const [addRole, setAddRole] = useState('viewer')
@@ -36,7 +38,13 @@ export default function PoolMembers({ poolId, members, canAdmin, isOwner, curren
   }
 
   async function handleRemove(userId) {
-    if (!confirm('Mitglied wirklich entfernen?')) return
+    const ok = await confirm({
+      title: 'Mitglied entfernen?',
+      message: 'Das Mitglied verliert den Zugriff auf den Pool.',
+      confirmLabel: 'Entfernen',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await api.removePoolMember(poolId, userId)
       await onMembersChanged()

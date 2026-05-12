@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useConfirm } from './ConfirmDialog'
 
 const EMPTY_FORM = {
   name: '',
@@ -18,6 +19,7 @@ export default function AssistantManager({
   onUpdate,
   onDelete,
 }) {
+  const confirm = useConfirm()
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState('')
@@ -72,7 +74,13 @@ export default function AssistantManager({
   }
 
   async function handleDelete(id) {
-    if (!confirm('Assistent wirklich löschen?')) return
+    const ok = await confirm({
+      title: 'Assistent löschen?',
+      message: 'Diese Aktion kann nicht rückgängig gemacht werden.',
+      confirmLabel: 'Löschen',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await onDelete(id)
     } catch (e) {
