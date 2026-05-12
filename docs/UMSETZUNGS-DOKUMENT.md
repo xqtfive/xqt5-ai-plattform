@@ -698,6 +698,18 @@ Die sekundäre Seitenleiste (`.content-panel` zwischen `NavRail` und Hauptinhalt
 - Streaming-Race: `api.sendMessageStream`-Completion-Callback überschreibt `setActiveConversation` auch wenn die Nutzer:in mittendrin in eine andere Section gewechselt hat. Vorher schon vorhanden, durch persistente Sidebar etwas wahrscheinlicher; saubere Lösung braucht `AbortController` + Conversation-ID-Capture in `useRef` — eigener PR.
 - `.messages`/`input-form`-Padding (`24px 80px`) wird auf engen Desktop-Viewports knapper. Visuell post-deploy entscheiden.
 
+## Pool-Chat aus gemischter Chat-Liste: Sidebar-Entkopplung (umgesetzt 2026-05-12)
+
+Klick auf einen Pool-Chat in der unifizierten Chats-Seitenleiste (`mergedChatItems`) öffnet jetzt den Chat im Main-Bereich, ohne die Seitenleiste in den Pool-Nav-Modus zu wechseln. Neues State-Tripel `{displayedPool=Pool, activePool=null, activeSection='chat'}` repräsentiert „Pool-Chat im Hauptbereich, Seitenleiste auf gemischter Chat-Liste". Sidebar's Pool-Nav-Gate (`section === 'pools' && activePool`) bleibt false, die Liste bleibt sichtbar.
+
+Expliziter Wechsel in den Pool-Nav-Modus via neuem `<button class="pool-header-open-btn">Pool öffnen</button>` in `PoolHeader.jsx`. Conditional: Button versteckt sich, sobald `activePoolId === pool.id` (Seitenleiste zeigt bereits den Pool). Handler `handleOpenPoolSidebar()` in `App.jsx` setzt `activeSection='pools'`, `activePool=displayedPool`, `sidebarOpen=true`.
+
+**State-Hygiene erweitert:** `onOpenConversation`/`onCreateConversation` und `handleSectionChange`-Pools-Branch räumen jetzt zusätzlich `displayedPool` und `activePoolChatId` auf — verhindert Cross-Modus-Mismatches, in denen `displayedPool` rendert während die Seitenleiste eine andere Section zeigt.
+
+**PoolDetail re-mount via Key:** `<PoolDetail key={displayedPool.id}>` erzwingt sauberen Re-Mount beim Pool-Wechsel — eliminiert den Race zwischen stalem internen State und neuem `useEffect`-Reload.
+
+**Third-Click-Regression-Fix:** Die Re-Click-Logik auf denselben Pool-Chat scheiterte vorher, weil `activePoolChatId` als unverändert wahrgenommen wurde und der `consumedChatIdRef`-Guard in PoolDetail (`if (consumedChatIdRef.current === initialChatId) return`) den Reopen blockierte. Behoben durch (1) neuer `onPoolChatClosed`-Callback aus App.jsx an PoolDetail, der `activePoolChatId` null setzt sobald der/die Nutzer:in den Chat verlässt, plus (2) neuer `useEffect` in PoolDetail mit `[initialChatId]`-Dep, der `consumedChatIdRef` resettet sobald initialChatId null wird. Damit ist der nächste Klick auf denselben Chat ein echter State-Übergang `null → 'chat-1'`, der den Reopen triggert.
+
 ## i18n-Drift-Bereinigung (umgesetzt 2026-05-12)
 
 Drei kleine i18n-Patches an Pool-Komponenten beheben englisch-in-deutscher-UI-Regressionen und führen das `t()`-Pattern in fünf weitere Render-Stellen ein.

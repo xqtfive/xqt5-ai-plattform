@@ -541,3 +541,35 @@ Die `.content-panel` war bisher `position: absolute` über dem Hauptinhalt (Glas
 - **Dead-Code-Bereinigung:** Die alte `@media (max-width: 900px)`-Regel zielte auf eine `.sidebar`-Klasse, die im Code nicht existiert (vermutlich aus einem früheren Layout übrig). Wurde durch die neue `768px`-Mobile-Drawer-Regel ersetzt.
 
 Dateien: `frontend/src/App.jsx`, `frontend/src/components/Sidebar.jsx`, `frontend/src/styles.css`
+
+---
+
+## Pool-Chat aus der gemischten Chat-Liste öffnet ohne Sidebar-Wechsel (2026-05-12)
+
+**Anlass:** Die unifizierte „Chats"-Seitenleiste (`mergedChatItems`) listet persönliche Chats und Pool-Chats gemeinsam. Bisher hat ein Klick auf einen Pool-Chat in dieser Liste die Seitenleiste sofort in den Pool-Nav-Modus (Overview/Dokumente/Chats/Mitglieder-Tabs) umgeschaltet — der/die Nutzer:in verlor die Übersicht über andere Chats und musste manuell zurücknavigieren, um durch mehrere Chats zu blättern. Außerdem schließte sich nach dem persistenten-Seitenleisten-PR (2026-05-12) der Auto-Close-Mechanismus nicht mehr, was den Modi-Wechsel noch störender wahrnehmbar machte.
+
+**Verhaltensänderung:** Ein Klick auf einen Pool-Chat in der gemischten Liste öffnet jetzt nur den Chat im Hauptbereich. Die Seitenleiste bleibt im Chat-Listen-Modus. Der/die Nutzer:in kann weiter durch die Liste scrollen, andere Chats anklicken, oder den X-Button drücken. Wenn er/sie tatsächlich die volle Pool-Kontextleiste (Overview/Dokumente/Mitglieder-Tabs) öffnen möchte, gibt es einen neuen expliziten Button **„Pool öffnen"** im `PoolHeader` direkt neben dem Pool-Namen.
+
+**State-Modell-Erweiterung:** Die Kombination `{displayedPool=Pool, activePool=null, activeSection='chat'}` ist neu — bedeutet „Pool-Chat im Hauptbereich gerendert, Seitenleiste auf Chat-Liste". Sidebar's Pool-Nav-Render-Gate (`if (section === 'pools' && activePool)`) bleibt false, sodass die Seitenleiste im Chat-Modus rendert. Main-Rendering `displayedPool ? <PoolDetail> : <ChatArea>` zeigt korrekt das PoolDetail unabhängig von `activePool`.
+
+**`App.jsx`-Änderungen:**
+- `handleOpenChatItem`-Pool-Branch entfernt `setActiveSection('pools')` und `setActivePool(pool)`. Setzt nur noch `displayedPool`, `poolTab='chats'`, `activePoolChatId`, plus `setActiveConversation(null)` zur Säuberung.
+- `onOpenConversation` und `onCreateConversation` räumen jetzt zusätzlich `displayedPool` und `activePoolChatId` auf — verhindert „Persönlicher Chat ausgewählt, aber PoolDetail rendert immer noch im Main"-Mismatch (`displayedPool ? <PoolDetail>` würde sonst hängen bleiben).
+- `handleSectionChange`-Pools-Branch räumt jetzt zusätzlich `displayedPool` und `activePoolChatId` — Wechsel von „Pool-Chat in Chat-Listen-Modus" zum Pools-Section beginnt frisch.
+- Neue Funktion `handleOpenPoolSidebar()`: setzt `activeSection='pools'`, `activePool=displayedPool`, `setSidebarOpen(true)`. Wird via Prop an `<PoolDetail>` durchgereicht, dort weiter an `<PoolHeader>`.
+- `<PoolDetail>` bekommt jetzt `key={displayedPool.id}` — erzwingt Re-Mount bei Pool-Wechsel, sodass interner State (chats/documents/members/activeChat) sauber resettet wird, statt zwischen den alten Daten und dem `useEffect`-Reload-Race zu flackern.
+- `<PoolDetail>` bekommt neuen `onPoolChatClosed`-Callback, der `activePoolChatId` zurücksetzt — siehe nächster Abschnitt zur Re-Click-Regression.
+
+**Fix: Third-Click-Regression beim selben Pool-Chat.** Die bestehende `consumedChatIdRef`-Dedup-Logik in `PoolDetail.jsx:38-44` blockt einen zweiten `handleOpenChat`-Aufruf, wenn `initialChatId` denselben Wert wie der zuletzt konsumierte hat — sinnvoll für Re-Renders, aber problematisch in der neuen Flow: Klick auf Chat 1 → öffnen → „Zurück"-Klick → erneuter Klick auf Chat 1 in der Liste. `activePoolChatId` bleibt `'chat-1'` (kein State-Change), `useEffect` feuert nicht, Chat öffnet sich nicht wieder. Behoben durch:
+- `App.jsx` reicht `onPoolChatClosed={() => setActivePoolChatId(null)}` an PoolDetail.
+- PoolDetail ruft `onPoolChatClosed?.()` im `onBack`-Handler der Chat-Area (zusätzlich zum bestehenden `setActiveChat(null)`).
+- PoolDetail bekommt einen neuen `useEffect` mit Dep `[initialChatId]`, der `consumedChatIdRef.current = null` setzt, wenn `initialChatId` null wird. Damit re-aktiviert ein erneuter Klick `null → 'chat-1'` als echten State-Change und der Chat öffnet wieder.
+
+**Neuer „Pool öffnen"-Button:** In `PoolHeader.jsx` als Sibling von `.pool-header-text` innerhalb von `.pool-header-identity` gerendert — NICHT innerhalb von `.pool-header-text`, weil dieses Flex-Container `flex-direction: column` ist und den Button unter den Pool-Namen stapeln würde. Conditional-Rendering: `{activePoolId !== pool.id && (...)}` — sobald die Seitenleiste bereits den Pool-Nav-Modus für genau diesen Pool zeigt, ist der Button überflüssig und verschwindet. Label „Pool öffnen", Tooltip „Pool-Übersicht in der Seitenleiste öffnen". CSS-Klasse `.pool-header-open-btn` matcht das Visual-Vokabular der bestehenden `.pool-header-count`-Badges (kleines Outline-Button-Pattern, sanftes Hover).
+
+**Was bewusst nicht geändert wurde:**
+- Persönliche Chats in der gemischten Liste verhalten sich wie vorher (öffnen ChatArea im Main).
+- Pool-Nav-Modus der Seitenleiste (wenn der/die Nutzer:in via NavRail „Pools" → Pool-Auswahl reingegangen ist) unverändert.
+- Defensive Null-Checks in `handleDeletePool`/`handleLeavePool` nicht hinzugefügt — die Trigger-Buttons leben nur im Pool-Nav-Modus, wo `activePool` immer truthy ist.
+
+Dateien: `frontend/src/App.jsx`, `frontend/src/components/PoolDetail.jsx`, `frontend/src/components/PoolHeader.jsx`, `frontend/src/styles.css`

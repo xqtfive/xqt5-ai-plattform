@@ -17,6 +17,9 @@ export default function PoolDetail({
   onCountsUpdate,
   onError,
   initialChatId,
+  onOpenPoolSidebar,
+  activePoolId,
+  onPoolChatClosed,
 }) {
   const [activeChat, setActiveChat] = useState(null)
   const [chats, setChats] = useState([])
@@ -42,6 +45,14 @@ export default function PoolDetail({
     consumedChatIdRef.current = initialChatId
     handleOpenChat(initialChatId)
   }, [initialChatId, activeTab])
+
+  // When the parent clears activePoolChatId (e.g., user backed out of a chat),
+  // also reset the consumed-ref so re-clicking the same chat in the merged list
+  // re-opens it. Without this, the deduplication guard at line 41 would block
+  // re-open since the ref still holds the previous chat id.
+  useEffect(() => {
+    if (!initialChatId) consumedChatIdRef.current = null
+  }, [initialChatId])
 
   // Report counts to parent (for sidebar display)
   useEffect(() => {
@@ -223,6 +234,8 @@ export default function PoolDetail({
         counts={{ docs: documents.length, chats: chats.length, members: members.length }}
         members={members}
         onTabChange={onTabChange}
+        onOpenPoolSidebar={onOpenPoolSidebar}
+        activePoolId={activePoolId}
       />
       {activeTab === 'chats' && activeChat ? (
         <PoolChatArea
@@ -235,7 +248,7 @@ export default function PoolDetail({
           onSend={handleSendMessage}
           onModelChange={setChatModel}
           onImageModeChange={setChatImageMode}
-          onBack={() => setActiveChat(null)}
+          onBack={() => { setActiveChat(null); onPoolChatClosed?.() }}
         />
       ) : (
         <div className="pool-content">

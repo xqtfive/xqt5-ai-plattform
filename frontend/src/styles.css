@@ -3501,6 +3501,27 @@ body {
   max-width: 260px;
 }
 
+.pool-header-open-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  margin-left: 8px;
+  border: 1px solid var(--color-border);
+  background: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-light);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.pool-header-open-btn:hover {
+  background: var(--color-bg);
+  color: var(--color-dark);
+  border-color: var(--color-dark);
+}
+
 .pool-header-spacer {
   flex: 1;
 }

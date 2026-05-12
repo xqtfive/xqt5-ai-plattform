@@ -42,8 +42,10 @@ function IconMembers() {
  * @param {{ docs: number, chats: number, members: number }} props.counts
  * @param {Array<{ user_id: string, username: string, role: string }>} props.members
  * @param {(tabName: string) => void} props.onTabChange
+ * @param {() => void} props.onOpenPoolSidebar
+ * @param {string|null} props.activePoolId
  */
-export default function PoolHeader({ pool, counts, members, onTabChange }) {
+export default function PoolHeader({ pool, counts, members, onTabChange, onOpenPoolSidebar, activePoolId }) {
   if (!pool) return null
 
   const MAX_VISIBLE_AVATARS = 5
@@ -70,6 +72,16 @@ export default function PoolHeader({ pool, counts, members, onTabChange }) {
             </span>
           )}
         </div>
+        {activePoolId !== pool.id && (
+          <button
+            type="button"
+            className="pool-header-open-btn"
+            onClick={onOpenPoolSidebar}
+            title="Pool-Übersicht in der Seitenleiste öffnen"
+          >
+            Pool öffnen
+          </button>
+        )}
       </div>
 
       <div className="pool-header-spacer" />

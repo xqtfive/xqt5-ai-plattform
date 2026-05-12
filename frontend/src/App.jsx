@@ -251,6 +251,8 @@ export default function App() {
     setLoading(true)
     setError('')
     setActivePool(null)
+    setDisplayedPool(null)
+    setActivePoolChatId(null)
     setActiveSection('chat')
     try {
       const created = await api.createConversation('New Conversation', assistantId)
@@ -280,6 +282,8 @@ export default function App() {
     setLoading(true)
     setError('')
     setActivePool(null)
+    setDisplayedPool(null)
+    setActivePoolChatId(null)
     setActiveSection('chat')
     try {
       const full = await api.getConversation(id)
@@ -308,13 +312,10 @@ export default function App() {
     if (item.kind === 'personal') {
       return onOpenConversation(item.id)
     }
-    // Pool chat: navigate into pool + seed activePoolChatId
-    setActiveSection('pools')
+    // Pool chat: open in main but keep sidebar in chat-list mode.
     const pool = pools.find(p => p.id === item.pool_id)
-    if (pool) {
-      setActivePool(pool)
-      setDisplayedPool(pool)
-    }
+    if (pool) setDisplayedPool(pool)
+    setActiveConversation(null)
     setPoolTab('chats')
     setActivePoolChatId(item.id)
   }
@@ -538,6 +539,8 @@ export default function App() {
       setShowAdmin(false)
     } else if (section === 'pools') {
       setActiveConversation(null)
+      setDisplayedPool(null)
+      setActivePoolChatId(null)
       setShowAdmin(false)
     }
   }
@@ -614,6 +617,13 @@ export default function App() {
     loadPools()
   }
 
+  function handleOpenPoolSidebar() {
+    if (!displayedPool) return
+    setActiveSection('pools')
+    setActivePool(displayedPool)
+    setSidebarOpen(true)
+  }
+
   if (!authChecked) {
     return (
       <div className="app-loading">
@@ -678,6 +688,7 @@ export default function App() {
         <AdminDashboard onClose={() => { setShowAdmin(false); setActiveSection('chat'); loadModels() }} currentUser={user} />
       ) : displayedPool ? (
         <PoolDetail
+          key={displayedPool.id}
           pool={displayedPool}
           models={models}
           selectedModel={selectedModel}
@@ -687,6 +698,9 @@ export default function App() {
           onCountsUpdate={setPoolCounts}
           onError={(msg) => setError(msg)}
           initialChatId={activePoolChatId}
+          onOpenPoolSidebar={handleOpenPoolSidebar}
+          activePoolId={activePool?.id}
+          onPoolChatClosed={() => setActivePoolChatId(null)}
         />
       ) : (
         <ChatArea
