@@ -56,6 +56,8 @@ const STRINGS = {
     'doc.status.processing': 'Wird verarbeitet',
     'doc.status.processing.long':
       'OCR und Indexierung laufen — der Inhalt ist gleich verfügbar',
+    'doc.action.delete': 'Dokument löschen',
+    'doc.chunks': 'Chunks',
   },
   en: {
     // Placeholder for future English translations. Until populated, t() falls

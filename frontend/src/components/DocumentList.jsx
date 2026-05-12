@@ -10,7 +10,7 @@ export default function DocumentList({ documents, onDelete }) {
         <span
           key={doc.id}
           className={`document-item doc-status-${doc.status}`}
-          title={doc.error_message || doc.summary || `${doc.chunk_count} chunks`}
+          title={doc.error_message || doc.summary || `${doc.chunk_count} ${t('doc.chunks')}`}
         >
           <FileTypeIcon type={doc.file_type} size={15} className="doc-icon" />
           <span className="doc-name">{doc.filename}</span>
@@ -29,7 +29,7 @@ export default function DocumentList({ documents, onDelete }) {
           <button
             className="doc-delete"
             onClick={() => onDelete(doc.id)}
-            title="Remove document"
+            title={t('doc.action.delete')}
           >
             &times;
           </button>
