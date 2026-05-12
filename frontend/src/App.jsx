@@ -57,10 +57,13 @@ export default function App() {
   const [activeSection, setActiveSection] = useState('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // Close sidebar when clicking outside of it
+  // Close sidebar when clicking outside of it — mobile drawer behaviour only.
+  // On desktop the panel is a persistent layout column (see styles.css media
+  // query at 768px); outside-click closing would feel wrong there.
   useEffect(() => {
     if (!sidebarOpen) return
     function handleMouseDown(e) {
+      if (!window.matchMedia('(max-width: 768px)').matches) return
       if (!e.target.closest('.content-panel') && !e.target.closest('.nav-rail')) {
         setSidebarOpen(false)
       }
@@ -245,7 +248,6 @@ export default function App() {
   }
 
   async function onCreateConversation(assistantId = null) {
-    setSidebarOpen(false)
     setLoading(true)
     setError('')
     setActivePool(null)
@@ -275,7 +277,6 @@ export default function App() {
   }
 
   async function onOpenConversation(id) {
-    setSidebarOpen(false)
     setLoading(true)
     setError('')
     setActivePool(null)
@@ -533,6 +534,7 @@ export default function App() {
     if (section === 'chat') {
       setActivePool(null)
       setDisplayedPool(null)
+      setActivePoolChatId(null)
       setShowAdmin(false)
     } else if (section === 'pools') {
       setActiveConversation(null)
@@ -548,7 +550,6 @@ export default function App() {
     setActivePool(pool)
     setDisplayedPool(pool)
     setPoolTab('overview')
-    setSidebarOpen(false)
   }
 
   async function handleDeletePool() {
@@ -609,7 +610,7 @@ export default function App() {
 
   function handleClosePool() {
     setActivePool(null)
-    // displayedPool intentionally kept — main area stays on last pool
+    setDisplayedPool(null)
     loadPools()
   }
 
@@ -667,10 +668,11 @@ export default function App() {
         onSelectPool={handleSelectPool}
         onCreatePool={handleCreatePool}
         onJoinPool={handleJoinPool}
-        onPoolTabChange={(tab) => { setPoolTab(tab); setSidebarOpen(false) }}
+        onPoolTabChange={(tab) => setPoolTab(tab)}
         onClosePool={handleClosePool}
         onDeletePool={handleDeletePool}
         onLeavePool={handleLeavePool}
+        onCloseSidebar={() => setSidebarOpen(false)}
       />
       {showAdmin ? (
         <AdminDashboard onClose={() => { setShowAdmin(false); setActiveSection('chat'); loadModels() }} currentUser={user} />

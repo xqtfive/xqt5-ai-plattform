@@ -70,6 +70,7 @@ export default function Sidebar({
   onClosePool,
   onDeletePool,
   onLeavePool,
+  onCloseSidebar,
 }) {
   const [selectedAssistantId, setSelectedAssistantId] = useState('')
   const [joinToken, setJoinToken] = useState('')
@@ -92,12 +93,26 @@ export default function Sidebar({
 
   const panelClass = `content-panel${open ? '' : ' content-panel--hidden'}`
 
+  function CloseSidebarButton() {
+    return (
+      <button
+        className="panel-header-close"
+        onClick={onCloseSidebar}
+        aria-label="Seitenleiste schließen"
+        title="Seitenleiste schließen"
+      >&times;</button>
+    )
+  }
+
   // ── Chat Section ────────────────────────────────────────────────────────────
   if (section === 'chat') {
     return (
       <div className={panelClass}>
         <div className="content-panel-header">
           <span className="content-panel-title">Chats</span>
+          <div className="content-panel-header-actions">
+            <CloseSidebarButton />
+          </div>
         </div>
 
         <div className="content-panel-actions">
@@ -192,13 +207,16 @@ export default function Sidebar({
 
     return (
       <div className={panelClass}>
-        {/* Back to pool list */}
-        <button className="pool-nav-back" onClick={onClosePool}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-          Alle Pools
-        </button>
+        {/* Back to pool list + close sidebar */}
+        <div className="pool-nav-top">
+          <button className="pool-nav-back" onClick={onClosePool}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Alle Pools
+          </button>
+          <CloseSidebarButton />
+        </div>
 
         {/* Pool identity */}
         <div className="pool-nav-identity">
@@ -276,6 +294,7 @@ export default function Sidebar({
           <button className="panel-header-btn panel-header-btn--primary" onClick={() => setShowCreate(true)} title="Pool erstellen">
             + Neu
           </button>
+          <CloseSidebarButton />
         </div>
       </div>
 

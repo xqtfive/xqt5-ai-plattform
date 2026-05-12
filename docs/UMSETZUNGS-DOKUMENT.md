@@ -682,6 +682,22 @@ Frontend-Architektur-Erweiterung: zwei neue Primitive ersetzen rohes `.modal-ove
 
 - **Anti-Scope:** zwei Vorschau-Modale in `PoolDocuments.jsx` (`.pool-preview-modal-backdrop`, `.pool-text-modal`) bleiben ungewandelt (anderes Pattern, fullscreen Datei-Preview). Eine `IconButton`-Primitive für aria-label-Sweep auf alle Icon-only-Buttons ist Folge-Scope.
 
+## Persistente Seitenleiste — Overlay → Layout-Spalte (umgesetzt 2026-05-12)
+
+Die sekundäre Seitenleiste (`.content-panel` zwischen `NavRail` und Hauptinhalt) wurde von einem auto-schließenden Overlay (`position: absolute`, schloss beim Öffnen eines Chats/Pools) zu einer persistenten Layout-Spalte umgebaut, die offen bleibt bis die Nutzer:in sie explizit schließt.
+
+**CSS-Modell:** `.content-panel` ist jetzt `position: static` mit `flex-shrink: 0` und `width: 248px` — ein normales Flex-Item in `.app`, das `ChatArea`/`PoolDetail` neben sich drückt. `.content-panel--hidden` ist `display: none` (sauberer Layout-Kollaps). Glassmorph-Optik (`backdrop-filter`, abgerundete Ecken, Schatten) bleibt visuell erhalten. Eine `@media (max-width: 768px)`-Regel revertet die Seitenleiste auf engen Viewports zurück zu `position: absolute` + `scale+opacity`-Animation, sodass Mobile als Drawer-Overlay funktioniert (sonst würde 56 px NavRail + 248 px Seitenleiste den Hauptinhalt erdrücken).
+
+**Schließ-Affordanzen:** Drei Wege, das Panel zu schließen — (1) NavRail-Icon der aktiven Section nochmals klicken, (2) Home-Logo, (3) neuer X-Button im Panel-Header (gerendert in allen drei Sidebar-Modi via `CloseSidebarButton`-Komponente in `Sidebar.jsx`, gemeinsame `.panel-header-close`-CSS-Klasse). Der Pool-Nav-Modus bekam einen neuen `.pool-nav-top`-Container, der den „Alle Pools"-Back-Button und den X-Button in einer Flex-Row gruppiert.
+
+**State-Cleanup in `App.jsx`:** Fünf Auto-Close-`setSidebarOpen(false)`-Aufrufe entfernt (in `onCreateConversation`, `onOpenConversation`, `handleSelectPool`, `onPoolTabChange`-JSX-Prop, sowie der Click-Outside-`useEffect`). Der admin-Branch in `handleSectionChange` behält das `setSidebarOpen(false)` als bewusste Ausnahme (Admin bleibt voll-Breite). `handleClosePool` räumt jetzt `displayedPool` zusätzlich zu `activePool` (verhindert „Seitenleiste zeigt Pool-Liste, Hauptinhalt zeigt alten Pool"-Mismatch). `handleSectionChange`-Chat-Branch räumt zusätzlich `activePoolChatId`, damit pool→chat→pool keine alten Pool-Chats reseed.
+
+**Mobile-Drawer-JS-Wiring:** Das Click-Outside-`useEffect` in `App.jsx` hat einen `window.matchMedia('(max-width: 768px)').matches`-Guard — Outside-Click-Close feuert ausschließlich, wenn die Media-Query aktiv ist (Drawer-Modus). Auf Desktop bleibt das Panel offen, auch wenn die Nutzer:in in den Hauptinhalt klickt.
+
+**Bekannte Edge Cases (geparkt):**
+- Streaming-Race: `api.sendMessageStream`-Completion-Callback überschreibt `setActiveConversation` auch wenn die Nutzer:in mittendrin in eine andere Section gewechselt hat. Vorher schon vorhanden, durch persistente Sidebar etwas wahrscheinlicher; saubere Lösung braucht `AbortController` + Conversation-ID-Capture in `useRef` — eigener PR.
+- `.messages`/`input-form`-Padding (`24px 80px`) wird auf engen Desktop-Viewports knapper. Visuell post-deploy entscheiden.
+
 ## i18n-Drift-Bereinigung (umgesetzt 2026-05-12)
 
 Drei kleine i18n-Patches an Pool-Komponenten beheben englisch-in-deutscher-UI-Regressionen und führen das `t()`-Pattern in fünf weitere Render-Stellen ein.
