@@ -145,10 +145,25 @@ function TextFileIcon({ size }) {
   )
 }
 
+// "Tabelle" — doc shape + folded corner + small 2×2 grid inside the body
+// to signal tabular data. Used for csv/xlsx/xls.
+function TableFileIcon({ size }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <rect x="7" y="11" width="10" height="8" rx="0.5" />
+      <line x1="7" y1="15" x2="17" y2="15" />
+      <line x1="12" y1="11" x2="12" y2="19" />
+    </svg>
+  )
+}
+
 const FILE_TYPE_ICONS = {
   pdf: PdfFileIcon,
   image: ImageFileIcon,
   txt: TextFileIcon,
+  table: TableFileIcon,
 }
 
 // ── Chat-list icons (used in PoolChatList) ──
@@ -266,9 +281,13 @@ export function PoolIcon({ emoji, size = 18, className, style }) {
   )
 }
 
+// Tabular file types (csv/xlsx/xls) all render with the table icon.
+const TABLE_FILE_TYPES = new Set(['csv', 'xlsx', 'xls'])
+
 /**
  * Renders a file-type icon. Accepts the `file_type` value the backend
- * stores: 'pdf', 'image', or anything else (treated as a text/note file).
+ * stores: 'pdf', 'image', 'csv'/'xlsx'/'xls' (tabular), or anything else
+ * (treated as a text/note file).
  */
 export function FileTypeIcon({ type, size = 15, className, style }) {
   if (!LINE_ICONS_ENABLED) {
@@ -276,7 +295,9 @@ export function FileTypeIcon({ type, size = 15, className, style }) {
       ? '\u{1F4C4}'
       : type === 'image'
         ? '\u{1F5BC}\u{FE0F}'
-        : '\u{1F4DD}'
+        : TABLE_FILE_TYPES.has(type)
+          ? '\u{1F4CA}'
+          : '\u{1F4DD}'
     return (
       <span
         className={className}
@@ -286,7 +307,13 @@ export function FileTypeIcon({ type, size = 15, className, style }) {
       </span>
     )
   }
-  const key = type === 'pdf' ? 'pdf' : type === 'image' ? 'image' : 'txt'
+  const key = type === 'pdf'
+    ? 'pdf'
+    : type === 'image'
+      ? 'image'
+      : TABLE_FILE_TYPES.has(type)
+        ? 'table'
+        : 'txt'
   const SvgIcon = FILE_TYPE_ICONS[key]
   return (
     <span

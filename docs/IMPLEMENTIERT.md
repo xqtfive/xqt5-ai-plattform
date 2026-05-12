@@ -505,3 +505,13 @@ Dateien: `frontend/src/components/PoolChatList.jsx`, `frontend/src/components/Do
 
 Dateien (neu): `frontend/src/components/Modal.jsx`, `frontend/src/components/ConfirmDialog.jsx`
 Dateien (geändert): `frontend/src/main.jsx` (ConfirmProvider-Mount), `frontend/src/App.jsx`, `frontend/src/components/CreatePoolDialog.jsx`, `frontend/src/components/PoolShareDialog.jsx`, `frontend/src/components/AssistantManager.jsx`, `frontend/src/components/TemplateManager.jsx`, `frontend/src/components/AdminDashboard.jsx`, `frontend/src/components/PoolMembers.jsx`, `frontend/src/components/PoolChatList.jsx`, `frontend/src/components/PoolDocuments.jsx`, `frontend/src/components/FileUpload.jsx`, `frontend/src/styles.css` (+10 Zeilen CSS)
+
+---
+
+## Tabellen-Icon für csv/xlsx/xls (2026-05-12)
+
+**Anlass:** In der Pool-Dokumentenliste wurden hochgeladene Spreadsheets (`.xlsx`/`.xls`) und CSV-Dateien mit dem Text-Datei-Icon (Dokumentsilhouette mit Schreibstift) gerendert. Grund: `FileTypeIcon` (`frontend/src/components/Icon.jsx`) hatte nur drei Mappings — `pdf`, `image`, alles andere → `txt`. Die drei tabellarischen Formate fielen in den `txt`-Bucket und sahen damit wie Notizen aus.
+
+**Korrektur:** Neue Line-Art-Komponente `TableFileIcon` (Dokumentsilhouette mit umgeklappter Ecke wie die anderen Filetype-Icons, plus innenliegendem 2×2-Gitter mit `rx="0.5"`-Abgerundung). Renderstil identisch zu den Geschwister-Icons: `viewBox 24×24`, `stroke="currentColor"`, `strokeWidth 1.6`, `strokeLinecap/Linejoin round`. Neuer Schlüssel `table` in der `FILE_TYPE_ICONS`-Map; neuer `TABLE_FILE_TYPES`-Set kapselt das `{csv, xlsx, xls}`-Resolver-Mapping in `FileTypeIcon`. Emoji-Fallback (für den `LINE_ICONS_ENABLED = false`-Modus) auf `\u{1F4CA}` (Balkendiagramm) für tabellarische Typen erweitert.
+
+Dateien: `frontend/src/components/Icon.jsx`
