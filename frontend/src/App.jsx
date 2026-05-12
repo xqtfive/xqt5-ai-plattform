@@ -47,6 +47,7 @@ export default function App() {
   const [activePool, setActivePool] = useState(null)      // controls sidebar nav panel
   const [displayedPool, setDisplayedPool] = useState(null) // controls main content area
   const [poolTab, setPoolTab] = useState('chats')
+  const [chatListResetSignal, setChatListResetSignal] = useState(0)
   const [poolCounts, setPoolCounts] = useState({ docs: 0, chats: 0, members: 0 })
 
   // Pool chats in main chat list (Phase 2)
@@ -546,6 +547,23 @@ export default function App() {
   }
 
   // Pool handlers
+
+  // Re-click of the already-active Chats tab in the pool-nav sidebar returns
+  // the user to the pool's chat list (closes the active chat). Implemented via
+  // a counter signal so PoolDetail's internal `activeChat` state can react.
+  //
+  // IMPORTANT: only the Sidebar's pool-nav tab path goes through this handler.
+  // PoolHeader count badges, PoolOverview shortcuts, and PoolDetail's internal
+  // `handleOpenChat` use direct `setPoolTab` — routing them through here would
+  // trigger the reset and clobber activeChat right after it was set.
+  function handlePoolTabChange(newTab) {
+    if (newTab === 'chats' && poolTab === 'chats') {
+      setChatListResetSignal(s => s + 1)
+      setActivePoolChatId(null)
+    }
+    setPoolTab(newTab)
+  }
+
   async function handleSelectPool(pool) {
     setActiveConversation(null)
     setShowAdmin(false)
@@ -553,6 +571,7 @@ export default function App() {
     setActivePool(pool)
     setDisplayedPool(pool)
     setPoolTab('overview')
+    setActivePoolChatId(null)
   }
 
   async function handleDeletePool() {
@@ -678,7 +697,7 @@ export default function App() {
         onSelectPool={handleSelectPool}
         onCreatePool={handleCreatePool}
         onJoinPool={handleJoinPool}
-        onPoolTabChange={(tab) => setPoolTab(tab)}
+        onPoolTabChange={handlePoolTabChange}
         onClosePool={handleClosePool}
         onDeletePool={handleDeletePool}
         onLeavePool={handleLeavePool}
@@ -695,6 +714,7 @@ export default function App() {
           user={user}
           activeTab={poolTab}
           onTabChange={setPoolTab}
+          chatListResetSignal={chatListResetSignal}
           onCountsUpdate={setPoolCounts}
           onError={(msg) => setError(msg)}
           initialChatId={activePoolChatId}

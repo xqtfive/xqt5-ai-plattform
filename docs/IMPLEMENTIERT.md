@@ -573,3 +573,39 @@ Dateien: `frontend/src/App.jsx`, `frontend/src/components/Sidebar.jsx`, `fronten
 - Defensive Null-Checks in `handleDeletePool`/`handleLeavePool` nicht hinzugefügt — die Trigger-Buttons leben nur im Pool-Nav-Modus, wo `activePool` immer truthy ist.
 
 Dateien: `frontend/src/App.jsx`, `frontend/src/components/PoolDetail.jsx`, `frontend/src/components/PoolHeader.jsx`, `frontend/src/styles.css`
+
+---
+
+## „Chats"-Tab erneut anklicken zeigt wieder die Pool-Chat-Liste (2026-05-12)
+
+**Anlass:** In der Pool-Nav-Seitenleiste (Tabs Overview/Dokumente/Chats/Mitglieder) konnte man bislang nicht aus einem geöffneten Pool-Chat zurück zur Chat-Liste navigieren, indem man einfach den „Chats"-Tab nochmals klickte. Da der Tab bereits aktiv war (`poolTab === 'chats'`), war der Klick ein No-Op — kein State-Change, keine Re-Render-Kette. Der Workaround war: erst auf „Dokumente" oder eine andere Tab klicken, dann wieder auf „Chats", was den bestehenden `useEffect`-Reset bei Tab-Verlassen feuern ließ. Unintuitiv.
+
+**Verhaltensänderung:** Klick auf den bereits aktiven „Chats"-Tab in der Pool-Nav-Seitenleiste schließt jetzt einen offenen Pool-Chat und kehrt zur Pool-Chat-Liste zurück (`PoolDetail.activeChat = null`). Wenn der Chat-List-View ohnehin schon aktiv ist, ist der Klick weiterhin sichtbar wirkungslos (keine Flicker, kein Reload).
+
+**Architektur — Counter-Signal-Pattern:** Die Schwierigkeit war, dass `activeChat` ein internes State der `PoolDetail`-Komponente ist, während `poolTab` und die Tab-Buttons in App.jsx und Sidebar.jsx leben. Wenn App.jsx den Tab auf denselben Wert setzt (`setPoolTab('chats')` bei `poolTab === 'chats'`), erkennt React keine Änderung — es gibt also keinen Pfad, der die Information „bitte schließe den Chat" nach PoolDetail durchreicht. Lösung: eine neue Zähler-State-Variable `chatListResetSignal` (`useState(0)`) in App.jsx, die bei jeder Re-Click-Erkennung inkrementiert wird. PoolDetail bekommt sie als Prop und beobachtet sie via `useEffect` mit `[chatListResetSignal]`-Dep, wo es `setActiveChat(null)` aufruft. Jede Änderung des Signals — egal um wieviel — feuert den Effect. Idiomatic React-Pattern für „Parent-zu-Child-Imperativ-Signal".
+
+**Neue `handlePoolTabChange`-Funktion in App.jsx:**
+```js
+function handlePoolTabChange(newTab) {
+  if (newTab === 'chats' && poolTab === 'chats') {
+    setChatListResetSignal(s => s + 1)
+    setActivePoolChatId(null)
+  }
+  setPoolTab(newTab)
+}
+```
+- Das Inkrement passiert NUR beim Re-Click des bereits aktiven Chats-Tabs. Andere Tab-Wechsel (Chats → Dokumente, Overview → Chats, etc.) feuern weiterhin den bestehenden `if (activeTab !== 'chats') setActiveChat(null)`-Effect in PoolDetail (Zeile 35-37) — der Signal-Mechanismus ist zusätzlich, nicht ersetzend.
+- `setActivePoolChatId(null)` räumt zusätzlich die App-Level-ID, damit Request 1's `consumedChatIdRef`-Reset-Effect korrekt feuert. Der/die Nutzer:in kann denselben Chat danach wieder öffnen, ohne dass die Dedup-Logik blockt.
+
+**Wichtig — selektive Verdrahtung:** Der neue Handler ist NUR an die Pool-Nav-Tab-Buttons in `Sidebar.jsx` verdrahtet (via `onPoolTabChange={handlePoolTabChange}`). Andere Tab-Wechsel-Pfade gehen weiterhin direkt über `setPoolTab`:
+- `<PoolDetail onTabChange={setPoolTab}>` (Zeile 716) bleibt direkt verdrahtet, weil `PoolDetail.handleOpenChat` (Zeile 153) intern `onTabChange('chats')` aufruft, BEVOR es `setActiveChat(chat)` setzt. Würden wir das durch `handlePoolTabChange` routen, würde der Signal-Effect feuern und `setActiveChat(null)` aufrufen, was den frisch gesetzten Chat sofort wieder leeren würde.
+- PoolHeader-Count-Badges (`onClick={() => onTabChange('chats')}` etc.) und PoolOverview-„Alle anzeigen"-Links nutzen ebenfalls den direkten Pfad. Folge: ein Re-Click auf das Chats-Badge in PoolHeader schließt den offenen Chat NICHT. Dies ist als bewusster UX-Trade-off akzeptiert — der Badge ist primär ein Stat-Counter mit Sekundär-Funktion, nicht der primäre Navigations-Trigger. Die UX-Anfrage zielte explizit auf „im Pool-Sidebar" (= Pool-Nav-Tabs).
+
+**Bonus-Fix: Stale-Chat-ID-Leak zwischen Pools.** In `handleSelectPool` wurde zusätzlich `setActivePoolChatId(null)` ergänzt. Vor dieser Änderung konnte folgender Bug auftreten: Pool A → Chat 1 öffnen → Admin-Section → zurück zu Pools → Pool B auswählen. `activePoolChatId` blieb `'chat-1'` (von Pool A). PoolDetail mountete mit `initialChatId='chat-1'`. Solange der/die Nutzer:in im Overview-Tab blieb, kein Schaden, weil der `consumedChatIdRef`-Effect auf `activeTab === 'chats'` gattert. Sobald sie aber auf den Chats-Tab klickten, würde der Effect `handleOpenChat('chat-1')` gegen Pool B's API aufrufen — 404 oder leerer Chat. Mit der neuen `setActivePoolChatId(null)`-Zeile räumt jeder explizite Pool-Wechsel die Chat-ID auf.
+
+**Anti-Scope:**
+- Re-Click der Dokumente-Tab schließt nicht das Vorschau-Modal in `PoolDocuments.jsx` — anderes Pattern (Modal, nicht interner Sub-View), separates Scope.
+- Re-Click der Members-Tab hat keinen Sub-View zum Resetten — nichts zu tun.
+- Streaming-Race aus Request-1-Doku weiterhin offen (eigenes Scope).
+
+Dateien: `frontend/src/App.jsx`, `frontend/src/components/PoolDetail.jsx`

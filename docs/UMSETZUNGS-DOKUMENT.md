@@ -710,6 +710,14 @@ Expliziter Wechsel in den Pool-Nav-Modus via neuem `<button class="pool-header-o
 
 **Third-Click-Regression-Fix:** Die Re-Click-Logik auf denselben Pool-Chat scheiterte vorher, weil `activePoolChatId` als unverändert wahrgenommen wurde und der `consumedChatIdRef`-Guard in PoolDetail (`if (consumedChatIdRef.current === initialChatId) return`) den Reopen blockierte. Behoben durch (1) neuer `onPoolChatClosed`-Callback aus App.jsx an PoolDetail, der `activePoolChatId` null setzt sobald der/die Nutzer:in den Chat verlässt, plus (2) neuer `useEffect` in PoolDetail mit `[initialChatId]`-Dep, der `consumedChatIdRef` resettet sobald initialChatId null wird. Damit ist der nächste Klick auf denselben Chat ein echter State-Übergang `null → 'chat-1'`, der den Reopen triggert.
 
+## „Chats"-Tab-Re-Click zeigt wieder die Pool-Chat-Liste (umgesetzt 2026-05-12)
+
+Re-Click des aktiven „Chats"-Tabs in der Pool-Nav-Seitenleiste schließt einen offenen Pool-Chat und kehrt zur Chat-Liste zurück. Implementiert via Counter-Signal-Pattern: neue State-Variable `chatListResetSignal` (`useState(0)`) in `App.jsx`, inkrementiert in `handlePoolTabChange(newTab)` wenn `newTab === 'chats' && poolTab === 'chats'`. `PoolDetail` empfängt das Signal als Prop und beobachtet es via `useEffect` mit `[chatListResetSignal]`-Dep, wo es `setActiveChat(null)` aufruft. Idiomatisches Parent-zu-Child-Imperativ-Signal — kleinster Aufwand, lokalisiert, kein Refactor des `activeChat`-State nach oben in App.jsx nötig.
+
+**Selektive Verdrahtung:** Der neue Handler ist NUR an die Pool-Nav-Tab-Buttons in `Sidebar.jsx` verdrahtet. `<PoolDetail onTabChange={setPoolTab}>` bleibt direkt — weil `PoolDetail.handleOpenChat` intern `onTabChange('chats')` aufruft, würde das Routing durch `handlePoolTabChange` den Signal-Effect feuern und den frisch gesetzten Chat sofort wieder schließen. Auch PoolHeader-Count-Badges und PoolOverview-Shortcuts bleiben am direkten Pfad. Folge: nur der Sidebar-Tab triggert den Reset; die Badges in PoolHeader nicht. Bewusster UX-Trade-off — der/die Nutzer:in fragte explizit nach „im Pool-Sidebar", die Badges sind sekundäre Stat-Counter.
+
+**Bonus-Fix in `handleSelectPool`:** `setActivePoolChatId(null)` ergänzt, um den Stale-Chat-ID-Leak zwischen Pools zu schließen (Pool A → Admin → Pool B könnte vorher Chat-IDs verwechseln, wenn der/die Nutzer:in auf den Chats-Tab klickte).
+
 ## i18n-Drift-Bereinigung (umgesetzt 2026-05-12)
 
 Drei kleine i18n-Patches an Pool-Komponenten beheben englisch-in-deutscher-UI-Regressionen und führen das `t()`-Pattern in fünf weitere Render-Stellen ein.

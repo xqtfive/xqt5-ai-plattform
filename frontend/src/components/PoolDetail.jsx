@@ -20,6 +20,7 @@ export default function PoolDetail({
   onOpenPoolSidebar,
   activePoolId,
   onPoolChatClosed,
+  chatListResetSignal,
 }) {
   const [activeChat, setActiveChat] = useState(null)
   const [chats, setChats] = useState([])
@@ -53,6 +54,15 @@ export default function PoolDetail({
   useEffect(() => {
     if (!initialChatId) consumedChatIdRef.current = null
   }, [initialChatId])
+
+  // External reset signal from App.jsx — fires when the user re-clicks the
+  // already-active Chats tab in the pool-nav sidebar, asking us to close the
+  // active chat and show the chat list. Counter pattern: any change in
+  // chatListResetSignal triggers a reset. Initial mount fires once with the
+  // current value; activeChat is null on fresh mount so it's a no-op.
+  useEffect(() => {
+    setActiveChat(null)
+  }, [chatListResetSignal])
 
   // Report counts to parent (for sidebar display)
   useEffect(() => {
