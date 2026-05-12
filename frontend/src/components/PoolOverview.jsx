@@ -19,7 +19,11 @@ function formatDate(iso) {
 }
 
 function sortByDate(items) {
-  return [...items].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+  return [...items].sort(
+    (a, b) =>
+      new Date(b.last_message_at || b.created_at || 0) -
+      new Date(a.last_message_at || a.created_at || 0),
+  )
 }
 
 // ── Role badge ────────────────────────────────────────────────────────────────
@@ -181,7 +185,7 @@ export default function PoolOverview({
                   <span className="pool-overview-chat-meta">
                     {chat.message_count} {t('pool.overview.chat.message_count')}
                     {' · '}
-                    {formatDate(chat.created_at)}
+                    {formatDate(chat.last_message_at || chat.created_at)}
                   </span>
                 </div>
                 <span className={`pool-overview-chat-badge pool-overview-chat-badge--${chat.is_shared ? 'shared' : 'private'}`}>

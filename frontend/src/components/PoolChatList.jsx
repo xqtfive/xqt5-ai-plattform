@@ -16,8 +16,14 @@ export default function PoolChatList({ chats, userId, onOpenChat, onCreateChat, 
     if (ok) onDeleteChat(chatId)
   }
 
-  const sharedChats = chats.filter((c) => c.is_shared)
-  const privateChats = chats.filter((c) => !c.is_shared)
+  const sortedChats = [...chats].sort(
+    (a, b) =>
+      (b.last_message_at || b.created_at || '').localeCompare(
+        a.last_message_at || a.created_at || ''
+      )
+  )
+  const sharedChats = sortedChats.filter((c) => c.is_shared)
+  const privateChats = sortedChats.filter((c) => !c.is_shared)
 
   return (
     <div className="pool-chat-list">

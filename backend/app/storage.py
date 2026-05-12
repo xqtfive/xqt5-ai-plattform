@@ -36,22 +36,31 @@ def create_conversation(
 
 
 def list_conversations(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
-    query = supabase.table("chats").select("id,created_at,title,user_id").order("created_at", desc=True)
+    query = supabase.table("chats").select("id,created_at,title,user_id")
     if user_id:
         query = query.eq("user_id", user_id)
 
     result = query.execute()
     items: List[Dict[str, Any]] = []
     for row in result.data:
-        count_result = supabase.table("chat_messages").select("id", count="exact").eq("chat_id", row["id"]).execute()
+        msg_q = (
+            supabase.table("chat_messages")
+            .select("created_at", count="exact")
+            .eq("chat_id", row["id"])
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
         items.append(
             {
                 "id": row["id"],
                 "created_at": row["created_at"],
                 "title": row["title"],
-                "message_count": count_result.count or 0,
+                "message_count": msg_q.count or 0,
+                "last_message_at": msg_q.data[0]["created_at"] if msg_q.data else None,
             }
         )
+    items.sort(key=lambda c: c.get("last_message_at") or c.get("created_at") or "", reverse=True)
     return items
 
 

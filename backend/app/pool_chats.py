@@ -23,8 +23,9 @@ def list_all_pool_chats_for_user(user_id: str) -> List[Dict[str, Any]]:
     counts are not needed. Drop them at this aggregation layer to keep the
     endpoint fast — counts remain available in the per-pool view.
 
-    Result is sorted by `created_at` desc, suitable for chronological merging
-    with the user's personal conversations on the frontend.
+    Result is sorted by `last_message_at` desc (with `created_at` as fallback
+    for chats with no messages), suitable for activity-based merging with the
+    user's personal conversations on the frontend.
     """
     pools = pools_mod.list_pools_for_user(user_id)
     if not pools:
@@ -45,5 +46,5 @@ def list_all_pool_chats_for_user(user_id: str) -> List[Dict[str, Any]]:
             chat["pool_role"] = pool.get("role")
             out.append(chat)
 
-    out.sort(key=lambda c: c.get("created_at") or "", reverse=True)
+    out.sort(key=lambda c: c.get("last_message_at") or c.get("created_at") or "", reverse=True)
     return out

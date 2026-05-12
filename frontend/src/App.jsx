@@ -180,7 +180,10 @@ export default function App() {
     const personal = (conversations || []).map(c => ({ kind: 'personal', ...c }))
     const pool = (poolChats || []).map(c => ({ kind: 'pool', ...c }))
     return [...personal, ...pool].sort(
-      (a, b) => (b.created_at || '').localeCompare(a.created_at || '')
+      (a, b) =>
+        (b.last_message_at || b.created_at || '').localeCompare(
+          a.last_message_at || a.created_at || ''
+        )
     )
   }, [conversations, poolChats])
 

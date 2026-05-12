@@ -35,6 +35,7 @@ class ConversationMetadata(BaseModel):
     created_at: str
     title: str
     message_count: int
+    last_message_at: Optional[str] = None
 
 
 class ConversationResponse(BaseModel):

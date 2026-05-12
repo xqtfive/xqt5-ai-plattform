@@ -639,4 +639,44 @@ Alle neuen Stile werden über den Parent-Modifier `.panel-list--chats` eingegren
 - Pool-Nav-Modus der Seitenleiste (Pool-Tabs Overview/Dokumente/Chats/Mitglieder) ist nicht betroffen.
 - Icon.jsx: `GlobeIcon`, `LockIcon`, `ChatBubbleIcon` werden als neue Exports ergänzt (Scope der Sibling-Agents); dieses Dokument beschreibt nur die Integration in `Sidebar.jsx`.
 
+## Chat-Sortierung nach letzter Aktivität (2026-05-12)
+
+**Anlass:** Bislang wurden Chat-Listen nach Erstellungsdatum sortiert. Das führte zu einem praktischen Problem: Ein Chat, der seit gestern aktiv genutzt wird, verschwand unter neueren, aber leeren Chats. Besonders in der Pool-Ansicht mit vielen angelegten Chats war es schwer, den zuletzt genutzten Chat schnell wiederzufinden. Die Nutzer:innen erwarten intuitiv eine Sortierung nach Aktivität, nicht nach Anlagezeit.
+
+**Architekturentscheidung — Compute-on-Read statt denormalisierter Spalte:**
+
+Zwei Ansätze standen zur Auswahl: (1) eine `last_message_at`-Spalte in `pool_chats` und `chats` einführen, die per Trigger bei jedem Message-Insert aktuell gehalten wird, oder (2) das Datum bei jeder Chat-Listen-Abfrage zur Laufzeit berechnen. Gewählt wurde Option 2. Begründung: Ein Trigger auf `pool_chat_messages` hätte eine Supabase-seitige Funktion (in der Supabase-Instanz, nicht im Appcode) erfordert und wäre schwerer zu versionieren, zu testen und zu rollbacken. Compute-on-Read hält die gesamte Logik im Appcode, die Datenbankstruktur bleibt schlank, und für die typischen Chat-Mengen dieser Plattform ist der Mehraufwand pro Abfrage vernachlässigbar.
+
+**Kombinierte Count+Last-Row-Query — Supabase-Pattern:**
+
+Bisher wurde die Nachrichtenanzahl pro Chat mit `.select("id", count="exact")` abgefragt, was sämtliche Message-IDs über das Netzwerk transferierte, nur um am Ende `len(result.data)` aufzurufen. Dieser Ansatz wurde durch `.select("created_at", count="exact").order("created_at", desc=True).limit(1).execute()` ersetzt. Der Supabase-Python-Client gibt `.count` unabhängig von `.limit` zurück — `.count` enthält die Gesamtanzahl der Zeilen für das Filter-Prädikat, `.data` enthält nur die eine limitierte Zeile. Eine Query, kleinere Payload, zwei Informationen. Das alte `len(msg_count.data)`-Pattern war außerdem still fehlerhaft: nach Einführung von `.limit(1)` hätte es statt der echten Zahl immer 0 oder 1 geliefert, ohne Fehler zu werfen. Die korrekte Nutzung ist jetzt `msg_q.count` (Integer, direkt).
+
+**Sortier-Fallback-Semantik — `last_message_at || created_at`:**
+
+Der Sort-Key in allen drei betroffenen Listen ist `last_message_at || created_at`. Für Chats mit mindestens einer Nachricht ist `last_message_at` der Timestamp der letzten Nachricht. Für frisch angelegte Chats ohne Nachrichten ist `last_message_at` null — der Ausdruck fällt auf `created_at` zurück, das für einen neuen Chat gleich „jetzt" ist. Damit erscheint ein neuer Chat oben in der Liste und wandert erst nach unten, wenn ältere Chats neue Nachrichten erhalten. Ein früh diskutiertes Bedenken — „springt ein neuer Chat nach dem ersten Send ans Ende?" — ist unbegründet: nach dem ersten Message-Send hat `last_message_at` einen Wert, der in der Regel noch aktueller als jedes bestehende `created_at` ist, sodass der Chat oben bleibt.
+
+**Neue SQL-Migration:**
+
+`supabase/migrations/20260512_pool_chat_messages_created_idx.sql` legt einen zusammengesetzten Index `pool_chat_messages(chat_id, created_at DESC)` an. Dieser Index macht die `.order("created_at", desc=True).limit(1)`-Unterabfrage effizient und ist für den korrekten Betrieb des Features notwendig, aber kein Hard-Blocker: ohne den Index läuft die Abfrage per Seq-Scan, das Ergebnis bleibt korrekt. Der analoge Index auf `chat_messages(chat_id, created_at DESC)` existiert bereits seit der Migration vom 2026-02-15. Die neue Migration muss vor dem Code-Deploy manuell gegen die Supabase-Instanz ausgeführt werden.
+
+**Berührte Backend-Dateien:**
+
+- `backend/app/storage.py` — `list_conversations`: ersetzt Nachrichten-Zähler-Query, befüllt `last_message_at` pro Conversation.
+- `backend/app/pools.py` — `list_pool_chats` (Zeile ~382): gleiche Query-Umstellung; `list_all_pool_chats_for_user` (~450): `len(msg_count.data)` korrekt durch `msg_q.count` ersetzt.
+- `backend/app/pool_chats.py` — `list_all_pool_chats_for_user`: analog.
+- `backend/app/models.py` — `ConversationMetadata`: neues Feld `last_message_at: Optional[str] = None` (defensiv, bricht keine bestehenden Clients).
+
+**Frontend-Änderungen:**
+
+- `App.jsx` — `mergedChatItems` verwendet `last_message_at || created_at` als Sort-Key statt reinem `created_at`.
+- `PoolOverview.jsx` — `sortByDate` nutzt denselben kombinierten Sort-Key; in den „Letzte Chats"-Karten (Zeile 184) wird `formatDate(chat.last_message_at || chat.created_at)` angezeigt statt `formatDate(chat.created_at)`. Die Datumsanzeige in den Pool-Dokumenten-Karten bleibt bei `created_at` — Dokumente haben kein Last-Message-Konzept.
+- `PoolChatList.jsx` — defensiver Frontend-Sort vor dem Shared/Private-Split, als redundante Absicherung falls die API-Sortierung ungeordnet ankommt.
+
+**Anti-Scope:**
+
+- Kein `asyncio.gather` eingeführt — die N+1-Query-Struktur (eine Unterabfrage pro Chat) ist bewusst beibehalten. Für die aktuellen Datenmengen ist lineare Verarbeitung akzeptabel.
+- Kein Pydantic-Enforcement auf `last_message_at` — das Feld ist `Optional[str]`, um bestehende Clients nicht zu brechen und den Deploy ohne erzwungenes Frontend-Update zu ermöglichen.
+- Dokument-Datumsanzeige in PoolOverview unverändert (`created_at`).
+- Kein Message-Insert-Trigger — die gesamte Logik liegt im Appcode.
+
 Dateien: `frontend/src/App.jsx`, `frontend/src/components/PoolDetail.jsx`

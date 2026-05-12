@@ -730,6 +730,20 @@ Verstärkte visuelle Trennung zwischen persönlichen Chats und Pool-Chats in der
 
 Berührte Dateien: `frontend/src/components/Sidebar.jsx`, `frontend/src/styles.css`, `frontend/src/components/Icon.jsx` (neue Icon-Exports).
 
+## Chat-Sortierung nach letzter Aktivität (umgesetzt 2026-05-12)
+
+Chat-Listen werden jetzt nach der zuletzt gesendeten Nachricht sortiert, nicht nach Erstellungsdatum. Das betrifft drei Stellen: die unifizierte Seitenleisten-Liste (`mergedChatItems` in `App.jsx`), die „Letzte Chats"-Kacheln in `PoolOverview.jsx` und die Pool-Chat-Liste (`PoolChatList.jsx`).
+
+**Muster: Compute-on-Read.** `last_message_at` wird nicht als denormalisierte Spalte in den Chat-Tabellen gespeichert und nicht per Trigger aktuell gehalten. Stattdessen berechnet jede Chat-Listen-Abfrage das Datum zur Laufzeit — eine bewusste Entscheidung gegen Trigger-Komplexität und für Logik, die vollständig im Appcode versionierbar ist.
+
+**Kombinierte Supabase-Query.** Die bisherige `select("id", count="exact")`-Abfrage pro Chat übertrug alle Message-IDs nur für `len(result.data)`. Sie wird durch `.select("created_at", count="exact").order("created_at", desc=True).limit(1).execute()` ersetzt: `.count` liefert die Gesamtzahl (unabhängig von `.limit`), `.data[0]` liefert den letzten Zeitstempel. Eine Query, kleinere Payload, zwei Werte. Wichtig: `len(msg_count.data)` als Zähler-Pattern ist nach dieser Umstellung falsch — es liefert 0 oder 1 statt der echten Zahl. Korrekt ist `msg_q.count`.
+
+**Sort-Key.** `last_message_at || created_at` — für leere neue Chats greift `created_at` als Fallback, damit sie oben erscheinen bis die erste Nachricht landet.
+
+**Berührte Dateien:** `backend/app/storage.py` (`list_conversations`), `backend/app/pools.py` (`list_pool_chats`, `list_all_pool_chats_for_user`), `backend/app/pool_chats.py`, `backend/app/models.py` (`ConversationMetadata`), `frontend/src/App.jsx`, `frontend/src/components/PoolOverview.jsx` (Zeile 184: Datumsanzeige + Sort), `frontend/src/components/PoolChatList.jsx` (defensiver Frontend-Sort).
+
+**Manueller Deployschritt.** Migration `supabase/migrations/20260512_pool_chat_messages_created_idx.sql` (Index `pool_chat_messages(chat_id, created_at DESC)`) muss vor dem Code-Deploy ausgeführt werden. Ohne den Index ist das Feature funktional korrekt, aber Abfragen auf `pool_chat_messages` laufen per Seq-Scan. Der analoge Index auf `chat_messages` existiert seit 2026-02-15.
+
 ## i18n-Drift-Bereinigung (umgesetzt 2026-05-12)
 
 Drei kleine i18n-Patches an Pool-Komponenten beheben englisch-in-deutscher-UI-Regressionen und führen das `t()`-Pattern in fünf weitere Render-Stellen ein.

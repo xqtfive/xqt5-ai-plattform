@@ -439,15 +439,20 @@ def list_pool_chats(pool_id: str, user_id: str) -> List[Dict[str, Any]]:
         .execute()
     )
     all_chats = (shared.data or []) + (private.data or [])
-    # Enrich with message count
+    # Enrich each with message_count + last_message_at (single combined query).
     for chat in all_chats:
-        msg_count = (
+        msg_q = (
             supabase.table("pool_chat_messages")
-            .select("id", count="exact")
+            .select("created_at", count="exact")
             .eq("chat_id", chat["id"])
+            .order("created_at", desc=True)
+            .limit(1)
             .execute()
         )
-        chat["message_count"] = len(msg_count.data) if msg_count.data else 0
+        chat["message_count"] = msg_q.count or 0
+        chat["last_message_at"] = msg_q.data[0]["created_at"] if msg_q.data else None
+    # Sort by last activity (with created_at as fallback for chats with no messages).
+    all_chats.sort(key=lambda c: c.get("last_message_at") or c.get("created_at") or "", reverse=True)
     return all_chats
 
 

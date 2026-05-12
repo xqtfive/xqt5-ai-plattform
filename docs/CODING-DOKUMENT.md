@@ -356,3 +356,15 @@ Der Alternativentwurf wäre gewesen, jedes Chat-Item mit `.panel-item--chat` zu 
 **Faustregel:** Modifier auf der *Liste*, wenn der Kontext die Regel definiert. Modifier auf dem *Item*, wenn das Item selbst eine andere Semantik hat (z. B. `.panel-item--disabled`).
 
 **Lektion — Icon vs. absolut positionierter Button:** Das neue `.panel-item-icon`-Element (rechts im Row) benötigt `margin-right: 32px`, nicht 20 px. Der Hover-Delete-Button ist absolut positioniert und reicht bis ca. 28 px vom rechten Rand. Bei 20 px überlagert der Button das Icon, sobald Hover den Button einblendet. Wann immer ein inline liegendes Element neben einem absolut positionierten Hover-Control platziert wird, muss der `margin-right`-Wert die maximale Ausdehnung des Controls im Hover-Zustand abdecken — nicht nur den ruhenden Zustand.
+
+### 2026-05-12 — Supabase-Pattern: count + last-row in einer Query
+
+**Problem:** Wenn man für eine Liste von Eltern-Datensätzen gleichzeitig die Anzahl der Kind-Datensätze und den neuesten Kind-Datensatz braucht, liegt die naive Lösung bei zwei separaten Queries — oder bei `select("id", count="exact")`, das alle IDs überträgt, nur um `len(result.data)` aufzurufen.
+
+**Pattern:** `.select("col", count="exact").order("col", desc=True).limit(1).execute()` — eine einzige Query liefert beides. Der Supabase-Python-Client berechnet `.count` für das vollständige Filter-Prädikat, **unabhängig von `.limit`**. `.data` enthält nur die durch `.limit` begrenzten Zeilen. Für den Chat-Use-Case: `.select("created_at", count="exact").order("created_at", desc=True).limit(1)` liefert Gesamtanzahl per `result.count` und den jüngsten Timestamp per `result.data[0]["created_at"]` (falls `result.data` nicht leer).
+
+**Vorteil gegenüber bisherigem Ansatz:** `select("id", count="exact")` ohne Limit transferiert bei einem Chat mit 500 Nachrichten 500 UUID-Strings über das Netzwerk. Mit `.limit(1)` ist die Payload genau eine Zeile — unabhängig von der Gesamtzahl.
+
+**Präzedenzfall im Codebase:** `pools.py:382–388` (`has_ready_pool_documents`) nutzt dasselbe `.select(..., count="exact").limit(1)`-Pattern bereits, um zu prüfen ob mindestens ein fertiges Dokument vorliegt. Dieses Muster ist damit eine etablierte Konvention im Projekt.
+
+**Anti-Pattern — `len(msg_count.data)` als Zähler:** Sobald `.limit(1)` eingeführt wird, gibt `len(result.data)` immer 0 oder 1 zurück, nicht die echte Gesamtzahl. Das scheitert lautlos — kein Fehler, falsche Zahl. Korrekte Nutzung ist stets `result.count` (Integer, vom Client gesetzt). Niemals `len(result.data)` für Zählzwecke verwenden, wenn `.limit` gesetzt sein könnte.
