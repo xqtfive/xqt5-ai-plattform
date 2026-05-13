@@ -335,7 +335,11 @@ Mindestens eine Datei jedes neuen Formats (`.md`, `.csv`, `.docx`, `.xlsx`, `.xl
 
 ### Reihenfolge
 
-1. **Migration ausführen**: `supabase/migrations/20260513_a_image_generation.sql` gegen die Prod-Supabase-Instanz laufen lassen (via `supabase-meta /pg/query` oder Supabase-Dashboard SQL-Editor).
+1. **Migrationen ausführen (in dieser Reihenfolge)**:
+   1. `supabase/migrations/20260513_a_image_generation.sql` — Schema-Grundlage (3 Tabellen, 4 Spalten-Adds, Partial Unique Index).
+   2. `supabase/migrations/20260513_b_widen_source_check.sql` — v2-Pre-Bake: erweitert die `app_generated_images.source` CHECK-Constraint um `'chat_slash'` und `'pool_chat_slash'` (idempotent, `DROP CONSTRAINT IF EXISTS` + `ADD CONSTRAINT`). Pydantic bleibt in v1 auf `Literal["studio"]` eng — die DB-Permissivität ist erst in v2 aktiv nutzbar.
+
+   Beide via `supabase-meta /pg/query` oder Supabase-Dashboard SQL-Editor.
 2. **Backend deployen**: Coolify triggert Rebuild aus dem neuen Commit.
 3. **Frontend deployen**: Coolify triggert Rebuild des Frontend-Service.
 

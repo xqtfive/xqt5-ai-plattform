@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 def resolve_image_url(image_record: Dict[str, Any]) -> str:
     """Return the accessible URL for a generated image.
 
-    v1 only supports provider_url — the stored URL is returned unchanged.
-    Future storage kinds (supabase_storage, data_uri) extend this function.
+    v1 supports provider_url (signed URL from OpenAI/xAI) and data_uri
+    (base64-inlined for providers like gpt-image-1 that return b64_json).
+    Future supabase_storage kind extends this function.
     """
     storage_kind = image_record.get("storage_kind", "provider_url")
-    if storage_kind == "provider_url":
+    if storage_kind in ("provider_url", "data_uri"):
         return image_record.get("image_url") or ""
-    # Placeholder for future kinds — surface as empty rather than crash.
     logger.warning("resolve_image_url: unhandled storage_kind=%s", storage_kind)
     return image_record.get("image_url") or ""
 
@@ -64,15 +64,16 @@ def mark_image_succeeded(
     image_id: str,
     image_url: str,
     expires_at: Optional[datetime] = None,
+    storage_kind: str = "provider_url",
 ) -> Dict[str, Any]:
-    """Transition a pending row to succeeded and attach the provider URL."""
+    """Transition a pending row to succeeded and attach the URL or data URI."""
     updates: Dict[str, Any] = {
         "status": "succeeded",
         "image_url": image_url,
-        "storage_kind": "provider_url",
+        "storage_kind": storage_kind,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
-    if expires_at is not None:
+    if expires_at is not None and storage_kind == "provider_url":
         updates["provider_url_expires_at"] = expires_at.isoformat()
 
     result = (

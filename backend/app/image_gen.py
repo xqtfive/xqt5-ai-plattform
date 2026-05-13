@@ -141,7 +141,12 @@ async def _call_openai(
     prompt: str,
     parameters: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """POST to OpenAI images/generations and return {url: str}."""
+    """POST to OpenAI images/generations and return {url: str, storage_kind: str}.
+
+    Handles both response shapes:
+    - ``url`` field  → storage_kind='provider_url'  (dall-e-2, dall-e-3)
+    - ``b64_json`` field → storage_kind='data_uri'  (gpt-image-1)
+    """
     api_key = get_api_key("openai")
     if not api_key:
         raise HTTPException(status_code=503, detail="OpenAI API key not configured")
@@ -170,11 +175,18 @@ async def _call_openai(
 
     data = response.json()
     try:
-        url = data["data"][0]["url"]
+        item = data["data"][0]
     except (KeyError, IndexError) as exc:
         raise HTTPException(status_code=502, detail="Unexpected OpenAI response shape") from exc
 
-    return {"url": url}
+    if item.get("url"):
+        return {"url": item["url"], "storage_kind": "provider_url"}
+    if item.get("b64_json"):
+        return {
+            "url": f"data:image/png;base64,{item['b64_json']}",
+            "storage_kind": "data_uri",
+        }
+    raise HTTPException(status_code=502, detail="Unexpected OpenAI response shape")
 
 
 async def _call_xai(
@@ -182,7 +194,12 @@ async def _call_xai(
     prompt: str,
     parameters: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """POST to xAI images/generations and return {url: str}."""
+    """POST to xAI images/generations and return {url: str, storage_kind: str}.
+
+    Handles both response shapes:
+    - ``url`` field  → storage_kind='provider_url'
+    - ``b64_json`` field → storage_kind='data_uri'
+    """
     api_key = get_api_key("xai")
     if not api_key:
         raise HTTPException(status_code=503, detail="xAI API key not configured")
@@ -211,11 +228,18 @@ async def _call_xai(
 
     data = response.json()
     try:
-        url = data["data"][0]["url"]
+        item = data["data"][0]
     except (KeyError, IndexError) as exc:
         raise HTTPException(status_code=502, detail="Unexpected xAI response shape") from exc
 
-    return {"url": url}
+    if item.get("url"):
+        return {"url": item["url"], "storage_kind": "provider_url"}
+    if item.get("b64_json"):
+        return {
+            "url": f"data:image/png;base64,{item['b64_json']}",
+            "storage_kind": "data_uri",
+        }
+    raise HTTPException(status_code=502, detail="Unexpected xAI response shape")
 
 
 async def _call_provider(
@@ -396,7 +420,12 @@ async def generate_image_for_user(
 
     # 9a. Success
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=_PROVIDER_URL_TTL_MINUTES)
-    final_record = mark_image_succeeded(image_id, result["url"], expires_at=expires_at)
+    final_record = mark_image_succeeded(
+        image_id,
+        result["url"],
+        expires_at=expires_at,
+        storage_kind=result.get("storage_kind", "provider_url"),
+    )
     return final_record
 
 
