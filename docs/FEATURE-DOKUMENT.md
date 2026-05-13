@@ -406,32 +406,6 @@ LLM vergibt beim Upload automatisch Kategorien und Tags basierend auf dem extrah
 **Übersetzung**
 Dokumente oder Chat-Antworten on-the-fly übersetzen. Wahlweise beim Upload oder im Chat.
 
-**Bildgenerierung**
-
-> **SUPERSEDED — umgesetzt 2026-05-13.** Planungsnotizen unten sind historisch; die tatsächliche Umsetzung weicht in folgenden Punkten ab:
-> - `/api/generate-image` als separater Endpunkt: **ersetzt durch** einheitlichen Endpunkt `POST /api/images/generate`.
-> - „Bild-Modelle"-Tab: **umgesetzt als** „Bildmodelle"-Tab; der bisherige „Modelle"-Tab heißt jetzt „Chatmodelle" (id im Code bleibt `models`).
-> - `model_type`-Spalte an `app_model_config`: **shipped**. Werte: `'chat'`, `'image'`, `'embedding'`.
-> - Neuer Endpunkt für Nutzerlimits, Stil-Presets und Bild-Kosten: **shipped** (nicht im ursprünglichen Plan enthalten).
-> - Google Imagen: **verschoben auf v2** (abhängt von Supabase Storage).
-> - **Slash-Command `/bild`/`/image` im Chat: auf v2 verschoben.** Grund: Chat-Nachricht–Bild-Verlinkung nicht im v1-Storage-Layer verdrahtet. v1 liefert ausschließlich die Bilder-Galerie (Bilder-Tab).
->
-> Vollständige Implementierungsdokumentation: `docs/IMPLEMENTIERT.md` — Abschnitt „Bildgenerierung".
-
-Unterstützung für Bildgenerierungs-Modelle (z. B. DALL-E 3, Flux, Stable Diffusion via API, oder Gemini-Modelle mit nativer Bildausgabe wie `gemini-2.0-flash-exp`). Die aktuelle Architektur unterstützt ausschließlich Text-Modelle — alle Endpunkte, Response-Strukturen und Frontend-Rendering gehen von Text-Output aus.
-
-Nötige Erweiterungen:
-- Neuer Backend-Endpunkt `/api/generate-image` (kein Streaming, kein Chat-Flow)
-- Eigener API-Call zu Bildgenerierungs-Endpunkten (z. B. `/v1/images/generations`) — anderes Request/Response-Format als Chat-Completions
-- Response gibt Image-URL oder Base64 zurück statt Text-Delta
-- Neue Provider-Einträge in `PROVIDER_CONFIG` für Image-Endpunkte
-- Frontend: UI-Einstiegspunkt (z. B. `/image Prompt`-Command im Chat-Input oder separater Tab), `<img>`-Rendering statt Markdown
-- `app_model_config`: Spalte `model_type` mit breiten Werten: `chat`, `image`, `embedding`, `tts`, `video` — erweiterbar ohne Schema-Änderung
-- Admin-Dashboard: separater Tab "Bild-Modelle" neben "Chat-Modelle" — jeder Tab hat eigenes Default-Modell (`is_default` bleibt pro `model_type` eindeutig)
-- Separate Default-Konfiguration: ein Default-Chat-Modell + ein Default-Bild-Modell unabhängig voneinander setzbar
-
----
-
 ### Bildgenerierung (umgesetzt 2026-05-13)
 
 Text-to-Image-Generierung mit OpenAI- und xAI-Providern ist deployed. Vollständige Dokumentation in `docs/IMPLEMENTIERT.md` — Abschnitt „Bildgenerierung". Kurzübersicht:

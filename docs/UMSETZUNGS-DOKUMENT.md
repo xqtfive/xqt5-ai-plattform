@@ -766,7 +766,7 @@ Die neue Spalte `model_type varchar` (Werte: `'chat'`, `'image'`, `'embedding'`)
 
 ### Storage-Abstraktion
 
-`image_storage.resolve_image_url(record: dict) -> str` ist der einzige Punkt, der weiß, wo ein Bild physisch liegt. v1: `storage_kind = 'provider_url'` — gibt `record["image_url"]` unverändert zurück. v2: `storage_kind = 'supabase'` — baut eine Signed URL gegen Supabase Storage. Das API-Kontrakt (`image_url` im Response) und das Frontend-Rendering bleiben identisch; der v1→v2-Wechsel erfordert ausschließlich Backend-Änderungen.
+`image_storage.resolve_image_url(record: dict) -> str` ist der einzige Punkt, der weiß, wo ein Bild physisch liegt. v1 unterstützt zwei `storage_kind`-Werte: `'provider_url'` (CDN-URL von OpenAI/xAI, ca. 60 Min. gültig, nur bei `url`-Response) und `'data_uri'` (base64-inline aus `b64_json`-Response, z. B. von `gpt-image-1`; kein Ablauf). Beide werden unverändert aus `record["image_url"]` zurückgegeben. v2: `storage_kind = 'supabase'` — baut eine Signed URL gegen Supabase Storage. Das API-Kontrakt (`image_url` im Response) und das Frontend-Rendering bleiben über alle drei Werte identisch; der v1→v2-Wechsel erfordert ausschließlich Backend-Änderungen.
 
 ### Status-Spalte als Finanz-Integritätsmuster
 

@@ -1,6 +1,6 @@
 # Anwender Quickstart
 
-Stand: 22.03.2026
+Stand: 13.05.2026
 Produkt: **XQT5 AI Plattform**
 
 ## 1. Ziel in 5 Minuten

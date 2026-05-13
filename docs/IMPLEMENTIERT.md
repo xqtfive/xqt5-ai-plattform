@@ -742,7 +742,11 @@ Vor diesem Feature konnte das Setzen eines neuen Chat-Default-Modells versehentl
 
 ### Storage-Strategie
 
-v1: Provider-URLs werden direkt in `app_generated_images.image_url` gespeichert; `storage_kind = 'provider_url'`. OpenAI- und xAI-URLs sind ca. 60 Minuten gültig. `image_storage.resolve_image_url()` gibt die URL unverändert zurück.
+v1 unterstützt zwei `storage_kind`-Werte:
+- `'provider_url'` — OpenAI- und xAI-Antworten mit `url`-Feld (dall-e-2, dall-e-3, Grok-Image). Die Provider-URL wird unverändert in `app_generated_images.image_url` gespeichert; ca. 60 Minuten gültig.
+- `'data_uri'` — Antworten mit `b64_json`-Feld (gpt-image-1). Base64 wird als `data:image/png;base64,...`-URI in `image_url` inline gespeichert; kein Ablauf.
+
+`image_storage.resolve_image_url()` gibt in beiden Fällen die gespeicherte URL unverändert zurück. `mark_image_succeeded()` setzt `provider_url_expires_at` nur für `'provider_url'`, da `data_uri` nicht abläuft.
 
 v2 (geplant): Supabase Storage als permanenter Speicher; `storage_kind = 'supabase'`. Das API-Kontrakt und das Frontend-Rendering ändern sich dabei nicht — nur `resolve_image_url()` wird erweitert.
 
@@ -761,16 +765,16 @@ v2 (geplant): Supabase Storage als permanenter Speicher; `storage_kind = 'supaba
 **Backend:**
 - `backend/app/image_gen.py` — neu; Provider-Abstraktion für Bildgenerierung
 - `backend/app/image_storage.py` — neu; URL-Auflösung nach `storage_kind`
-- `backend/app/images.py` — neu; FastAPI-Router mit `POST /api/images/generate`
+- `backend/app/main.py` — Endpunkt `POST /api/images/generate` inline (kein separater Router; gemäß CLAUDE.md-Konvention bis zum geplanten `main.py`-Split)
 - `backend/app/admin.py` — Zeilen 204-205 korrigiert; neue Endpunkte für Bildmodelle, Bild-Stil, Nutzerlimits
 - `supabase/migrations/20260513_a_image_generation.sql` — neu; 3 Tabellen + 2×2 Spalten, vollständig idempotent
 
 **Frontend:**
-- `frontend/src/components/BilderTab.jsx` — neu; Bilder-Studio-Tab
+- `frontend/src/components/Bilder.jsx` — neu; Bilder-Studio-Tab (in `App.jsx:11` als `import Bilder from './components/Bilder'`)
 - `frontend/src/components/AdminDashboard.jsx` — Bildmodelle-Tab, Bild-Stil-Tab, Bild-Kosten-Sektion, Chatmodelle-Umbenennung
 - `frontend/src/App.jsx` — Bilder-NavRail-Eintrag (Slash-Command-Handler in v2 verschoben)
 - `frontend/src/components/MessageBubble.jsx` — dormante `<img>`-Rendering-Branch für generierte Bilder (v1: nie aktiv, da kein Chat-Slash-Command; v2 re-aktiviert sie)
-- `frontend/src/styles/images.css` — Bilder-Tab- und Galerie-Styles
+- `frontend/src/styles.css` — Bilder-Tab- und Galerie-Styles in monolithische CSS-Datei integriert (`.bilder-*`-Selektoren); kein separates `styles/`-Verzeichnis
 
 **Docs:** 8 Dateien (IMPLEMENTIERT, UMSETZUNGS-DOKUMENT, ADMIN-DOKUMENT, ANWENDER-DOKUMENT, FEATURE-DOKUMENT, SECURITY, CODING-DOKUMENT, PROD-UPGRADE-PLAYBOOK, TODO)
 

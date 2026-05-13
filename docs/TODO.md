@@ -19,19 +19,9 @@ Erledigte Punkte werden nach `IMPLEMENTIERT.md` verschoben. Kein Informationsver
 
 Quelle: `basline-code/rag-vrm/shared/{progress,hashing,config}.py`, `ocr-benchmark/todo.md`, `articles/medium_ocr.txt`. Bündel an Maßnahmen die zusammen die größte Token-/Storage-/Konsistenz-Verbesserung bringen — verzahnt mit „Geplante Re-Embedding-Jobs" (Teil 6.4) und „Semantisches Caching" (Teil 7).
 
-- [ ] 🟠 **Content-Hash-basiertes Skip beim Upload und Re-Embed** (konkrete Umsetzung der ursprünglichen „Dokumenten Caching"-Idee)
-  - Beim Upload: `sha256(file_bytes) -> content_hash` berechnen. Wenn `app_documents`-Zeile mit gleichem `(scope, content_hash)` existiert → bestehende Chunks/Embeddings referenzieren, OCR + Embedding-Pipeline überspringen
-  - Beim nächtlichen Re-Embed (Teil 6.4): Dokumente mit unverändertem Hash überspringen (Cursor-Merkle-Pattern; rag-vrm nutzt mtime — wir nehmen Inhalts-Hash da robuster)
-  - Schema: `ALTER TABLE app_documents ADD COLUMN content_hash varchar(64); CREATE INDEX ON app_documents (content_hash);`
-  - Datei: `documents.py` (Upload-Pfad), `scheduled_jobs.py` (geplant)
-  - **Aufwand:** Klein-Mittel | **Wert:** Hoch — direkte Token-Ersparnis bei jedem Re-Upload
+- [x] ✅ **Content-Hash-basiertes Skip beim Upload (A1)** — geliefert 2026-05-06, dev-Migration angewendet; Details in `IMPLEMENTIERT.md` „Content-Hash Upload-Deduplikation (A1, 2026-05-06)". **Offen:** Re-Embed-Skip beim nächtlichen Job (Teil 6.4) und prod-Migration.
 
-- [ ] 🟠 **Bild-Deduplizierung per Content-Hash** (Logos/Briefköpfe wiederholen sich dutzendfach pro Pool)
-  - SHA256 über die Bild-Bytes; `app_document_assets.content_hash varchar(64)` mit UNIQUE-Constraint pro Scope
-  - Bei Asset-Persistenz: Hash vorhanden → bestehende `asset_id` referenzieren statt neuer Eintrag
-  - Wirkt zusammen mit Phase 3 (Bild-Speicher-Migration auf Supabase Storage) — Storage-Bytes drastisch reduziert
-  - Quelle: `ocr-benchmark/todo.md` als offener Punkt; gleiches Pattern wie Dokument-Hash oben
-  - **Aufwand:** Klein | **Wert:** Hoch — DB- und Storage-Kostenreduktion bei Multi-PDF-Pools
+- [x] ✅ **Bild-Deduplizierung per pHash (A2)** — Code geliefert 2026-05-06, Details in `IMPLEMENTIERT.md` „Bild-pHash Deduplikation (A2, 2026-05-06)". **Offen:** dev- und prod-Migration `20260506_c_asset_phash_recurring.sql` anwenden; Cross-Document-Dedup (tenant-scoped phash-Index) als Future-Work.
 
 - [ ] 🟠 **VLM-Inferenz-Cache** (Bild-Hash → Beschreibung, derselbe Hash wie oben wiederverwendbar)
   - Vor jedem VLM-Call: Cache-Lookup auf `content_hash`. Bei Miss: VLM aufrufen, Beschreibung speichern. TTL ∞ (Bild-Hash deterministisch, Modell-ID Teil des Cache-Keys)
@@ -68,19 +58,7 @@ Quelle: `basline-code/rag-vrm/shared/{progress,hashing,config}.py`, `ocr-benchma
 
 ## Ausstehende Frontend-Elemente (Backend bereits implementiert)
 
-Die folgenden Backend-Funktionen sind fertig (siehe `IMPLEMENTIERT.md`), die zugehörigen Admin-UI-Steuerelemente fehlen noch:
-
-- [ ] 🟠 **AdminDashboard.jsx — Toggle: Kontextuelles Retrieval** (Phase 4.2)
-  - Toggle für `contextual_retrieval_enabled` + Modell-Auswahl `contextual_retrieval_model`
-  - Datei: `frontend/src/components/AdminDashboard.jsx`
-
-- [ ] 🟠 **AdminDashboard.jsx — Toggle: Nachbar-Chunk-Abruf** (Phase 5.3)
-  - Toggle für `neighbor_chunks_enabled`
-  - Datei: `frontend/src/components/AdminDashboard.jsx`
-
-- [ ] 🟠 **AdminDashboard.jsx — Slider: Token-Budget** (Phase 7.1)
-  - Slider für `max_context_tokens` (bis 32.000)
-  - Datei: `frontend/src/components/AdminDashboard.jsx`
+- [x] ✅ **AdminDashboard.jsx — Toggle Kontextuelles Retrieval, Toggle Nachbar-Chunk-Abruf, Slider Token-Budget** — geliefert 2026-05-06; Details in `IMPLEMENTIERT.md` „Admin-UI Frontend-Toggles (2026-05-06)". Felder: `contextual_retrieval_enabled`, `contextual_retrieval_model`, `neighbor_chunks_enabled`, `max_context_tokens`.
 
 ---
 

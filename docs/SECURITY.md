@@ -199,9 +199,12 @@ Tabelle prüfen, ob neue Migration sie versehentlich an anon vergeben hat.
 
 ### Bildgenerierung — Provider-URLs, Prompts und Stil-Präfix
 
-**Provider-URLs sind temporär öffentlich.** OpenAI- und xAI-Bildgenerierungs-Antworten liefern direkte CDN-URLs zurück. Diese URLs sind ohne Authentifizierung abrufbar und laufen nach ca. 60 Minuten ab. Wer die URL kennt, kann das Bild in diesem Zeitfenster abrufen. Die URL wird in `app_generated_images.image_url` gespeichert; Zugriff darauf ist nur über das Backend möglich (kein direkter DB-Zugriff von außen).
+**Zwei Speicherpfade in v1 — unterschiedliche Risiko-Profile.** Die Spalte `app_generated_images.storage_kind` kann zwei Werte haben:
 
-Konsequenz: Generierte Bilder sind für die Lebensdauer der URL effektiv öffentlich, auch wenn der Nutzer kein Sharing beabsichtigt hat. Nutzer sollten darüber informiert werden (Hinweis in der ANWENDER-DOKUMENT.md vorhanden). In v2 werden Bilder in Supabase Storage mit Access-Control abgelegt; der Wechsel ist ohne API-Änderung möglich (`storage_kind`-Discriminator in `image_storage.py`).
+- `'provider_url'` (OpenAI/xAI mit `url`-Antwort): Provider-CDN-URL ohne Authentifizierung abrufbar, ca. 60 Min. gültig. Wer die URL kennt, kann das Bild in diesem Zeitfenster ohne Login abrufen. Die URL wird in `image_url` gespeichert; Zugriff darauf ist nur über das Backend (kein direkter DB-Zugriff von außen).
+- `'data_uri'` (z. B. `gpt-image-1` mit `b64_json`-Antwort): Bild-Bytes liegen base64-inline in derselben Spalte `image_url`. Kein Ablauf, keine CDN-Exposition; das Bild verlässt unsere DB nur, wenn das Backend es an den authentifizierten Frontend-Aufruf zurückgibt. Risikoprofil: stärker, dafür belegen die Bytes pro Bild ca. 1,3× die Roh-PNG-Größe in der DB-Zeile (Pgvector-Datenbank-Volumen beobachten).
+
+Konsequenz für `provider_url`: Generierte Bilder sind für die Lebensdauer der URL effektiv öffentlich, auch wenn der Nutzer kein Sharing beabsichtigt hat. Nutzer sollten darüber informiert werden (Hinweis in der ANWENDER-DOKUMENT.md vorhanden). Für `data_uri` entfällt dieses Risiko; dafür ist das Audit-Log und die Lösch-Pipeline wichtiger, da Bytes nicht „natürlich" durch URL-Ablauf verschwinden. In v2 werden alle Bilder in Supabase Storage mit Access-Control abgelegt (`storage_kind = 'supabase'`); der Wechsel ist ohne API-Änderung möglich (`storage_kind`-Discriminator in `image_storage.py`).
 
 **Prompts werden nicht im Audit-Log gespeichert.** Der vollständige Prompt-Text (inklusive Stil-Präfix) wird nicht in `app_audit_logs` eingetragen — nur Prompt-Länge, Nutzer-ID und Modell-ID. Das schützt vor versehentlichem Logging sensibler Prompt-Inhalte. Falls spätere Compliance-Anforderungen Prompt-Archivierung erfordern, muss dies explizit ergänzt werden.
 

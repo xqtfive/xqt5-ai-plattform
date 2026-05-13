@@ -364,8 +364,13 @@ Der Alternativentwurf wäre gewesen, jedes Chat-Item mit `.panel-item--chat` zu 
 
 **Storage-Abstraktion — `image_storage.resolve_image_url()`.**
 `backend/app/image_storage.py:resolve_image_url(record: dict) -> str` ist der einzige Ort, der den physischen Speicherort eines Bilds kennt. Er liest das Feld `storage_kind` aus dem DB-Record:
-- `'provider_url'` → gibt `record["image_url"]` unverändert zurück (v1)
+- `'provider_url'` → gibt `record["image_url"]` unverändert zurück (v1; OpenAI/xAI-CDN-URL, ca. 60 Min. gültig)
+- `'data_uri'` → gibt die `data:image/png;base64,…`-URI unverändert zurück (v1; aus `b64_json`-Antworten wie `gpt-image-1`)
 - `'supabase'` → baut eine Supabase-Storage-Signed-URL (v2, noch nicht implementiert)
+
+**Provider-Response-Shape-Routing:** `image_gen.py` muss in jedem Provider-Adapter beide Response-Shapes prüfen — `url` → `'provider_url'`, `b64_json` → `'data_uri'`. Neue Provider folgen demselben Pattern. Der Discriminator `storage_kind` ist der einzige Ort, an dem die Shape im Code sichtbar wird; alle Aufrufer behandeln `image_url` als opake URL.
+
+**`provider_url_expires_at`-Bedingung:** `mark_image_succeeded()` setzt das Ablaufdatum nur, wenn `storage_kind == 'provider_url'`. `data_uri` und `supabase` haben keinen Ablauf.
 
 Kein anderer Code darf `record["image_url"]` direkt auslesen und als finale URL behandeln. Die Abstraktion stellt sicher, dass der v1→v2-Speicherwechsel ausschließlich in dieser Funktion stattfindet — ohne API-Kontrakt- oder Frontend-Änderung.
 
