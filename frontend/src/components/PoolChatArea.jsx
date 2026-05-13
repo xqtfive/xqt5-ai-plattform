@@ -52,8 +52,9 @@ export default function PoolChatArea({
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (!input.trim() || loading) return
-    onSend(input.trim())
+    const trimmed = input.trim()
+    if (!trimmed || loading) return
+    onSend(trimmed)
     setInput('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }
@@ -89,6 +90,9 @@ export default function PoolChatArea({
             sources={m.sources}
             imageSources={m.image_sources}
             username={m.username}
+            generated_image_id={m.generated_image_id}
+            image_url={m.image_url}
+            prompt={m.prompt}
           />
         ))}
 

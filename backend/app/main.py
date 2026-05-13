@@ -43,6 +43,9 @@ from .models import (
     CreatePoolChatRequest,
     CreatePoolRequest,
     CreateTemplateRequest,
+    ImageGenerationRequest,
+    ImageStylePresetCreate,
+    ImageStylePresetUpdate,
     JoinPoolRequest,
     LoginRequest,
     RefreshRequest,
@@ -56,6 +59,7 @@ from .models import (
     UpdatePoolMemberRequest,
     UpdatePoolRequest,
     UpdateTemplateRequest,
+    UpdateUserLimitsRequest,
     UploadPoolTextRequest,
     UpdateUserRequest,
 )
@@ -63,6 +67,7 @@ from . import admin as admin_crud
 from . import assistants as assistants_crud
 from . import audit
 from . import documents as documents_mod
+from . import image_gen as image_gen_mod
 from . import pool_chats as pool_chats_mod
 from . import pools as pools_mod
 from . import providers as providers_mod
@@ -1342,8 +1347,11 @@ async def admin_rechunk_status(admin: Dict = Depends(get_current_admin)):
 
 
 @app.get("/api/admin/models", response_model=None)
-async def admin_list_models(admin: Dict = Depends(get_current_admin)):
-    return admin_crud.list_model_configs()
+async def admin_list_models(
+    admin: Dict = Depends(get_current_admin),
+    model_type: str = "chat",
+):
+    return admin_crud.list_model_configs(model_type=model_type)
 
 
 @app.post("/api/admin/models", response_model=None)
@@ -1357,6 +1365,8 @@ async def admin_create_model(
         display_name=request.display_name,
         sort_order=request.sort_order,
         deployment_name=request.deployment_name,
+        model_type=request.model_type,
+        pricing=request.pricing,
     )
     audit.log_event(
         audit.ADMIN_MODEL_CREATE,
@@ -2275,3 +2285,233 @@ async def delete_pool_chat(
         pools_mod.require_pool_role(pool_id, current_user["id"], "admin")
     pools_mod.delete_pool_chat(chat_id)
     return {"deleted": True}
+
+
+# ── Image generation endpoints ────────────────────────────────────────────────
+
+
+@app.post("/api/images/generate", response_model=None)
+@limiter.limit("10/minute")
+async def generate_image(
+    request: Request,
+    body: ImageGenerationRequest,
+    current_user: Dict = Depends(get_current_user),
+):
+    """Generate an image via OpenAI or xAI (n=1). Rate-limited to 10/min per user."""
+    if body.chat_id:
+        chat_row = (
+            supabase.table("chats")
+            .select("user_id")
+            .eq("id", body.chat_id)
+            .limit(1)
+            .execute()
+        )
+        if not chat_row.data:
+            raise HTTPException(status_code=404, detail="Chat nicht gefunden")
+        if chat_row.data[0]["user_id"] != current_user["id"]:
+            raise HTTPException(status_code=403, detail="Kein Zugriff auf diesen Chat")
+
+    if body.pool_chat_id:
+        pc = (
+            supabase.table("pool_chats")
+            .select("pool_id")
+            .eq("id", body.pool_chat_id)
+            .limit(1)
+            .execute()
+        )
+        if not pc.data:
+            raise HTTPException(status_code=404, detail="Pool-Chat nicht gefunden")
+        pool_id = pc.data[0]["pool_id"]
+        role = pools_mod.get_user_pool_role(pool_id, current_user["id"])
+        if role is None:
+            raise HTTPException(status_code=403, detail="Kein Zugriff auf diesen Pool")
+
+    return await image_gen_mod.generate_image_for_user(
+        user_id=current_user["id"],
+        model=body.model,
+        prompt=body.prompt,
+        parameters=body.parameters,
+        source=body.source,
+        chat_id=body.chat_id,
+        pool_chat_id=body.pool_chat_id,
+    )
+
+
+@app.get("/api/images/budget", response_model=None)
+@limiter.limit("60/minute")
+async def get_image_budget(
+    request: Request,
+    current_user: Dict = Depends(get_current_user),
+):
+    """Return the authenticated user's daily image cost budget."""
+    return image_gen_mod.get_user_budget(current_user["id"])
+
+
+@app.get("/api/images", response_model=None)
+async def list_user_images(
+    limit: int = 20,
+    offset: int = 0,
+    current_user: Dict = Depends(get_current_user),
+):
+    """Return the authenticated user's image gallery (succeeded images, newest first)."""
+    return image_gen_mod.get_user_gallery(current_user["id"], limit=limit, offset=offset)
+
+
+@app.delete("/api/images/{image_id}", response_model=None)
+@limiter.limit("20/minute")
+async def delete_generated_image(
+    image_id: str,
+    request: Request,
+    current_user: Dict = Depends(get_current_user),
+):
+    """Delete an image owned by the current user."""
+    row = (
+        supabase.table("app_generated_images")
+        .select("id, user_id, cost_usd, model, provider")
+        .eq("id", image_id)
+        .limit(1)
+        .execute()
+    )
+    if not row.data:
+        raise HTTPException(status_code=404, detail="Bild nicht gefunden")
+    image = row.data[0]
+    if image["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=404, detail="Bild nicht gefunden")
+
+    supabase.table("app_generated_images").delete().eq("id", image_id).execute()
+
+    audit.log_event(
+        audit.IMAGE_DELETE,
+        user_id=current_user["id"],
+        target_type="generated_image",
+        target_id=image_id,
+        metadata={
+            "provider": image.get("provider"),
+            "model": image.get("model"),
+            "cost_usd": float(image.get("cost_usd") or 0),
+        },
+    )
+    return {"deleted": True}
+
+
+@app.get("/api/admin/images/usage", response_model=None)
+@limiter.limit("20/minute")
+async def admin_image_usage(
+    request: Request,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    admin: Dict = Depends(get_current_admin),
+):
+    """Aggregated image generation usage report (admin only)."""
+    return image_gen_mod.get_image_usage_report(start_date=start_date, end_date=end_date)
+
+
+@app.get("/api/admin/image-style-presets", response_model=None)
+@limiter.limit("20/minute")
+async def list_image_style_presets(
+    request: Request,
+    admin: Dict = Depends(get_current_admin),
+):
+    return image_gen_mod.list_style_presets()
+
+
+@app.post("/api/admin/image-style-presets", response_model=None)
+@limiter.limit("20/minute")
+async def create_image_style_preset(
+    request: Request,
+    body: ImageStylePresetCreate,
+    admin: Dict = Depends(get_current_admin),
+):
+    preset = image_gen_mod.create_style_preset(
+        name=body.name,
+        prefix=body.prefix,
+        created_by=admin["id"],
+    )
+    audit.log_event(
+        action=audit.ADMIN_IMAGE_STYLE_PRESET_CREATE,
+        user_id=admin["id"],
+        target_type="image_style_preset",
+        target_id=preset["id"],
+        metadata={"name": body.name},
+    )
+    return preset
+
+
+@app.patch("/api/admin/image-style-presets/{preset_id}", response_model=None)
+@limiter.limit("20/minute")
+async def update_image_style_preset(
+    request: Request,
+    preset_id: str,
+    body: ImageStylePresetUpdate,
+    admin: Dict = Depends(get_current_admin),
+):
+    updated = image_gen_mod.update_style_preset(
+        preset_id,
+        **{k: v for k, v in body.model_dump().items() if v is not None},
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Style preset not found")
+    audit.log_event(
+        action=audit.ADMIN_IMAGE_STYLE_PRESET_UPDATE,
+        user_id=admin["id"],
+        target_type="image_style_preset",
+        target_id=preset_id,
+        metadata=body.model_dump(exclude_none=True),
+    )
+    return updated
+
+
+@app.delete("/api/admin/image-style-presets/{preset_id}", response_model=None)
+@limiter.limit("20/minute")
+async def delete_image_style_preset(
+    request: Request,
+    preset_id: str,
+    admin: Dict = Depends(get_current_admin),
+):
+    deleted = image_gen_mod.delete_style_preset(preset_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Style preset not found")
+    audit.log_event(
+        action=audit.ADMIN_IMAGE_STYLE_PRESET_DELETE,
+        user_id=admin["id"],
+        target_type="image_style_preset",
+        target_id=preset_id,
+    )
+    return {"deleted": True}
+
+
+@app.patch("/api/admin/users/{user_id}/limits", response_model=None)
+async def update_user_limits(
+    user_id: str,
+    body: UpdateUserLimitsRequest,
+    admin: Dict = Depends(get_current_admin),
+):
+    """Set per-user daily image cost cap. Admins cannot modify their own limits."""
+    if user_id == admin["id"]:
+        raise HTTPException(status_code=400, detail="Cannot modify your own limits")
+
+    from .database import supabase as _sb
+
+    existing = _sb.table("app_user_limits").select("daily_image_cost_limit_usd").eq("user_id", user_id).limit(1).execute()
+    old_value = existing.data[0]["daily_image_cost_limit_usd"] if existing.data else None
+
+    _sb.table("app_user_limits").upsert(
+        {
+            "user_id": user_id,
+            "daily_image_cost_limit_usd": body.daily_image_cost_limit_usd,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        on_conflict="user_id",
+    ).execute()
+
+    audit.log_event(
+        action=audit.ADMIN_USER_LIMIT_UPDATE,
+        user_id=admin["id"],
+        target_type="app_user",
+        target_id=user_id,
+        metadata={
+            "daily_image_cost_limit_usd_old": float(old_value) if old_value is not None else None,
+            "daily_image_cost_limit_usd_new": float(body.daily_image_cost_limit_usd),
+        },
+    )
+    return {"updated": True, "user_id": user_id, "daily_image_cost_limit_usd": body.daily_image_cost_limit_usd}

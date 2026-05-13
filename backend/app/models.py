@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Any, Dict, List, Literal, Optional
 
 
@@ -126,6 +126,16 @@ class CreateModelConfigRequest(BaseModel):
     display_name: str = Field(min_length=1)
     sort_order: int = 0
     deployment_name: Optional[str] = None
+    model_type: str = "chat"
+    pricing: Optional[Dict[str, Any]] = None
+
+    @field_validator("model_type")
+    @classmethod
+    def validate_model_type(cls, v: str) -> str:
+        allowed = {"chat", "image"}
+        if v not in allowed:
+            raise ValueError(f"model_type muss 'chat' oder 'image' sein, erhalten: {v!r}")
+        return v
 
 
 class UpdateModelConfigRequest(BaseModel):
@@ -202,3 +212,67 @@ class SendPoolMessageRequest(BaseModel):
 class UploadPoolTextRequest(BaseModel):
     title: Optional[str] = Field(default=None, max_length=200)
     content: str = Field(min_length=1, max_length=500000)
+
+
+# Image generation models
+class ImageGenerationRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=2000)
+    model: Optional[str] = None
+    parameters: Dict[str, Any] = {}
+    source: Literal["studio"]
+    chat_id: Optional[str] = None
+    pool_chat_id: Optional[str] = None
+
+
+class GeneratedImage(BaseModel):
+    id: str
+    user_id: str
+    prompt: str
+    resolved_prompt: str
+    provider: str
+    model: str
+    image_url: Optional[str] = None
+    storage_kind: str
+    status: str
+    error_message: Optional[str] = None
+    cost_usd: float
+    source: str
+    chat_id: Optional[str] = None
+    pool_chat_id: Optional[str] = None
+    provider_url_expires_at: Optional[str] = None
+    parameters_json: Dict[str, Any] = {}
+    created_at: str
+    updated_at: str
+
+
+class ImageStylePresetCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    prefix: str = Field(min_length=0, max_length=1000)
+
+
+class ImageStylePresetUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=100)
+    prefix: Optional[str] = Field(default=None, max_length=1000)
+    is_active: Optional[bool] = None
+
+
+class ImageStylePresetResponse(BaseModel):
+    id: str
+    scope_type: str
+    scope_id: Optional[str] = None
+    name: str
+    prefix: str
+    is_active: bool
+    created_by: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class UpdateUserLimitsRequest(BaseModel):
+    daily_image_cost_limit_usd: float = Field(ge=0.01, le=1000)
+
+
+class ImageGenerationUsage(BaseModel):
+    cost_usd_today: float
+    daily_limit_usd: float
+    remaining_usd: float

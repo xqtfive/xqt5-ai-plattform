@@ -251,6 +251,18 @@ export function GlobeIcon({ size = 15, className, style }) {
   )
 }
 
+// ── Nav-level icons (exported for use in NavRail) ──
+
+export function IconBilder({ size = 20, className, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <polyline points="21 15 16 10 5 21" />
+    </svg>
+  )
+}
+
 // ── Public components ──
 
 /**

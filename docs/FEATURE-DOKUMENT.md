@@ -407,6 +407,17 @@ LLM vergibt beim Upload automatisch Kategorien und Tags basierend auf dem extrah
 Dokumente oder Chat-Antworten on-the-fly übersetzen. Wahlweise beim Upload oder im Chat.
 
 **Bildgenerierung**
+
+> **SUPERSEDED — umgesetzt 2026-05-13.** Planungsnotizen unten sind historisch; die tatsächliche Umsetzung weicht in folgenden Punkten ab:
+> - `/api/generate-image` als separater Endpunkt: **ersetzt durch** einheitlichen Endpunkt `POST /api/images/generate`.
+> - „Bild-Modelle"-Tab: **umgesetzt als** „Bildmodelle"-Tab; der bisherige „Modelle"-Tab heißt jetzt „Chatmodelle" (id im Code bleibt `models`).
+> - `model_type`-Spalte an `app_model_config`: **shipped**. Werte: `'chat'`, `'image'`, `'embedding'`.
+> - Neuer Endpunkt für Nutzerlimits, Stil-Presets und Bild-Kosten: **shipped** (nicht im ursprünglichen Plan enthalten).
+> - Google Imagen: **verschoben auf v2** (abhängt von Supabase Storage).
+> - **Slash-Command `/bild`/`/image` im Chat: auf v2 verschoben.** Grund: Chat-Nachricht–Bild-Verlinkung nicht im v1-Storage-Layer verdrahtet. v1 liefert ausschließlich die Bilder-Galerie (Bilder-Tab).
+>
+> Vollständige Implementierungsdokumentation: `docs/IMPLEMENTIERT.md` — Abschnitt „Bildgenerierung".
+
 Unterstützung für Bildgenerierungs-Modelle (z. B. DALL-E 3, Flux, Stable Diffusion via API, oder Gemini-Modelle mit nativer Bildausgabe wie `gemini-2.0-flash-exp`). Die aktuelle Architektur unterstützt ausschließlich Text-Modelle — alle Endpunkte, Response-Strukturen und Frontend-Rendering gehen von Text-Output aus.
 
 Nötige Erweiterungen:
@@ -418,6 +429,20 @@ Nötige Erweiterungen:
 - `app_model_config`: Spalte `model_type` mit breiten Werten: `chat`, `image`, `embedding`, `tts`, `video` — erweiterbar ohne Schema-Änderung
 - Admin-Dashboard: separater Tab "Bild-Modelle" neben "Chat-Modelle" — jeder Tab hat eigenes Default-Modell (`is_default` bleibt pro `model_type` eindeutig)
 - Separate Default-Konfiguration: ein Default-Chat-Modell + ein Default-Bild-Modell unabhängig voneinander setzbar
+
+---
+
+### Bildgenerierung (umgesetzt 2026-05-13)
+
+Text-to-Image-Generierung mit OpenAI- und xAI-Providern ist deployed. Vollständige Dokumentation in `docs/IMPLEMENTIERT.md` — Abschnitt „Bildgenerierung". Kurzübersicht:
+
+- Einheitlicher Endpunkt `POST /api/images/generate`; v1: nur Bilder-Tab (NavRail); v2: + `/bild`/`/image`-Slash-Command
+- Provider-Abstraktion via `image_gen.py` (parallel zu `llm.py`); Storage-Abstraktion via `image_storage.resolve_image_url()`
+- 3 neue Tabellen: `app_generated_images`, `app_image_style_presets`, `app_user_limits`
+- `app_model_config` um `model_type` und `pricing` ergänzt
+- Status-Spalte (`pending`/`succeeded`/`failed`) für finanzielle Integrität
+- Tägliches Kostenlimit pro Nutzer mit Admin-Override; Selbstschutz auf eigenem Limit
+- Migration: `supabase/migrations/20260513_a_image_generation.sql`
 
 ---
 

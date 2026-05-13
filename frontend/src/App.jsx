@@ -8,6 +8,7 @@ import AdminDashboard from './components/AdminDashboard'
 import AssistantManager from './components/AssistantManager'
 import TemplateManager from './components/TemplateManager'
 import PoolDetail from './components/PoolDetail'
+import Bilder from './components/Bilder'
 import { useConfirm } from './components/ConfirmDialog'
 
 const FALLBACK_MODEL = 'google/gemini-3-pro-preview'
@@ -546,6 +547,12 @@ export default function App() {
       setDisplayedPool(null)
       setActivePoolChatId(null)
       setShowAdmin(false)
+    } else if (section === 'bilder') {
+      setActiveConversation(null)
+      setActivePoolChatId(null)
+      setDisplayedPool(null)
+      setActivePool(null)
+      setShowAdmin(false)
     }
   }
 
@@ -725,6 +732,8 @@ export default function App() {
           activePoolId={activePool?.id}
           onPoolChatClosed={() => setActivePoolChatId(null)}
         />
+      ) : activeSection === 'bilder' ? (
+        <Bilder onError={(msg) => setError(msg)} />
       ) : (
         <ChatArea
           conversation={activeConversation}

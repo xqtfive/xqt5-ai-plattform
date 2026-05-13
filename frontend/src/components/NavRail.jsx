@@ -1,3 +1,6 @@
+import { IconBilder } from './Icon'
+import { t } from '../i18n/strings'
+
 // ─── Nav Rail Icons (inline SVG, keine externe Abhängigkeit) ───────────────
 
 function IconChat() {
@@ -108,6 +111,12 @@ export default function NavRail({
           label="Pools"
           active={activeSection === 'pools'}
           onClick={() => onSectionChange('pools')}
+        />
+        <NavItem
+          icon={<IconBilder size={20} />}
+          label={t('nav.bilder.label')}
+          active={activeSection === 'bilder'}
+          onClick={() => onSectionChange('bilder')}
         />
       </div>
 

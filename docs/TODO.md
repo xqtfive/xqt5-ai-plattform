@@ -57,6 +57,15 @@ Quelle: `basline-code/rag-vrm/shared/{progress,hashing,config}.py`, `ocr-benchma
 
 ---
 
+## Geparkte Feature-Pläne (vollständig geplant, Umsetzung verschoben)
+
+- [ ] 🟡 **Servicemeldungen — Admin-Ankündigungs-Banner** (geparkt 2026-05-12)
+  - Vollständiger Plan inkl. 4 kritischer Review-Pässe in `docs/SERVICEMELDUNGEN-PLAN-SHELVED.md`
+  - Implementation-Team war designed (4 Impl + 2 Verify Agents), aber nicht gespawned
+  - Wiederaufnahme: das Shelved-Doc lesen, Codebase-Drift seit 2026-05-12 prüfen, dann das Team spawnen
+
+---
+
 ## Ausstehende Frontend-Elemente (Backend bereits implementiert)
 
 Die folgenden Backend-Funktionen sind fertig (siehe `IMPLEMENTIERT.md`), die zugehörigen Admin-UI-Steuerelemente fehlen noch:
@@ -371,13 +380,42 @@ Quellen: `kvml_test/` — die Anforderungen sind direkt als Produktverbesserunge
   - Admin: max. Tokens/Tag pro Nutzer, max. EUR/Monat pro Gruppe setzen
   - Soft-Warnung bei 80%, Hard-Block bei 100%; Nutzungs-Dashboard im Admin-Panel
 
-- [ ] 🟠 **Bild-Generierung** — ~4 Tage
-  - Mindestens einen Bild-Generierungs-Provider integrieren (z.B. DALL-E 3 via OpenAI API oder Stability AI)
-  - Bild-Generierungs-UI im Chat: dedizierter Eingabe-Modus, Prompt-Feld, optionale Stil-/Größen-Selektoren
-  - Admin: pro Provider aktivieren/deaktivieren, erlaubte Modelle konfigurieren, Corporate Style Presets setzen (Markenfarben, verbotene Inhaltskategorien)
-  - Generierte Bilder inline im Chat angezeigt; herunterladbar
-  - Kein Upload sensibler Bilddaten an externe Services — nur Generierung, keine eingehende Bildverarbeitung in diesem Feature
-  - Provider-Key via bestehendem verschlüsseltem Key-Speicher in DB verwaltet
+- [x] 🟠 **Bild-Generierung v1 — Bilder-Tab** — umgesetzt 2026-05-13 (~4 Tage)
+  - OpenAI + xAI als Provider; Bilder-Tab (NavRail)
+  - Admin: Bildmodelle-Tab, Bild-Stil-Tab, Bild-Kosten in Kosten-Tab, per-User-Tageslimit
+  - Status-Spalte für finanzielle Integrität; tägliches Kostenlimit mit System-Default-Fallback
+  - Storage v1: Provider-URLs mit `storage_kind`-Discriminator
+  - Korrektheit-Fix `admin.py:204-205`: `is_default`-Reset scoped auf `model_type`
+  - Details: `docs/IMPLEMENTIERT.md` — Abschnitt „Bildgenerierung"
+  - **/bild-Slash-Command aus v1 herausgenommen** — Frontend-Parser entfernt (2026-05-13)
+
+- [ ] 🟡 **Bildgenerierung v2 — `/bild`-Slash-Command im Chat**
+  - Erfordert: (a) beim Generieren mit `chat_id`/`pool_chat_id` auch `chat_messages`-Zeile mit `generated_image_id` setzen; (b) Entscheidung Message-Struktur (einzelne Assistenten-Nachricht vs. User+Assistant-Paar); (c) Frontend-Slash-Parser in `MessageInput.jsx` + `PoolChatArea.jsx` wiederherstellen; (d) `App.jsx`-Handler `handleGenerateImageInChat`/`handleGenerateImageInPoolChat` + `poolChatRefreshKey` + ChatArea/PoolDetail-Prop-Threading wiederherstellen; (e) i18n-Key `chat.slash.image.help` wiederherstellen; (f) Migration: ALTER CHECK constraint auf `app_generated_images.source` um `'chat_slash'` und `'pool_chat_slash'` erweitern (DROP CONSTRAINT + ADD CONSTRAINT). `models.py` Literal entsprechend anpassen.
+  - Pool-Sichtbarkeit: Shared Chat → alle Mitglieder sehen Bild; Private Chat → nur Ersteller
+
+- [ ] 🟡 **Bildgenerierung v2 — Supabase Storage Migration** — nach v1-Stabilisierung
+  - `storage_kind = 'supabase'` in `image_storage.resolve_image_url()` implementieren
+  - Bilder in Supabase Storage unter `{user_id}/{image_id}.{ext}` ablegen
+  - Signed URLs mit TTL statt temporärer Provider-URLs
+  - Hängt ab von: Google Imagen Support (gleicher Migrationsschritt)
+
+- [ ] 🟡 **Bildgenerierung v2 — Bild-zu-Bild / Edit / Inpaint** — nach Supabase Storage
+  - Bildbearbeitung über OpenAI Edits-API oder vergleichbare xAI-Funktion
+  - Inpainting: Maske auf bestehendem Bild zeichnen + Prompt
+
+- [ ] 🟡 **Bildgenerierung v2 — Per-Team und Per-Pool Stil-Presets**
+  - `scope_type = 'team'` und `scope_type = 'pool'` in `app_image_style_presets` befüllen
+  - Datenmodell bereits vorhanden; nur Backend-Lookup-Logik und Admin-UI ergänzen
+
+- [ ] 🟡 **Bildgenerierung v2 — Wasserzeichen auf generierten Bildern**
+  - Optionales Corporate-Wasserzeichen serverseitig einbetten (pillow/cairosvg)
+  - Admin-Toggle; Wasserzeichen-Text/-Logo konfigurierbar
+
+- [ ] 🟡 **Bildgenerierung v2 — Multi-Währungs-Kostenansicht**
+  - Kosten in EUR neben USD anzeigen (Wechselkurs via konfigurierbarem Faktor)
+
+- [ ] 🟡 **Bildgenerierung v2 — Google Imagen Support**
+  - Abhängt von Supabase Storage (Google liefert keine temporären CDN-URLs)
 
 - [ ] 🟠 **UI-Lokalisierung (Deutsch)** — ~1 Tag
   - Alle UI-Strings (Buttons, Labels, Platzhalter, Fehlermeldungen, Onboarding) auf Deutsch verfügbar

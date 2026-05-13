@@ -357,6 +357,27 @@ Der Alternativentwurf wäre gewesen, jedes Chat-Item mit `.panel-item--chat` zu 
 
 **Lektion — Icon vs. absolut positionierter Button:** Das neue `.panel-item-icon`-Element (rechts im Row) benötigt `margin-right: 32px`, nicht 20 px. Der Hover-Delete-Button ist absolut positioniert und reicht bis ca. 28 px vom rechten Rand. Bei 20 px überlagert der Button das Icon, sobald Hover den Button einblendet. Wann immer ein inline liegendes Element neben einem absolut positionierten Hover-Control platziert wird, muss der `margin-right`-Wert die maximale Ausdehnung des Controls im Hover-Zustand abdecken — nicht nur den ruhenden Zustand.
 
+### 2026-05-13 — Konventionen für Bildgenerierung
+
+**`app_model_config.model_type` — erweiterbare Typkennung.**
+`model_type` ist `varchar`, kein Postgres-Enum. Zulässige Werte in v1: `'chat'`, `'image'`, `'embedding'`. Neue Typen (z. B. `'tts'`, `'video'`) können in der DB registriert werden, ohne eine Schema-Migration zu erfordern. Code, der `model_type` auswertet, muss unbekannte Werte defensiv behandeln (Logging + Fehler, kein Silent-Ignore). Der `is_default`-Reset in `admin.py` (Zeilen 204-205) filtert immer auf `WHERE model_type = :model_type`, sodass Chat- und Bild-Defaults unabhängig bleiben. **Dieses Filter-Muster muss bei jedem zukünftigen `is_default`-Reset eingehalten werden.**
+
+**Storage-Abstraktion — `image_storage.resolve_image_url()`.**
+`backend/app/image_storage.py:resolve_image_url(record: dict) -> str` ist der einzige Ort, der den physischen Speicherort eines Bilds kennt. Er liest das Feld `storage_kind` aus dem DB-Record:
+- `'provider_url'` → gibt `record["image_url"]` unverändert zurück (v1)
+- `'supabase'` → baut eine Supabase-Storage-Signed-URL (v2, noch nicht implementiert)
+
+Kein anderer Code darf `record["image_url"]` direkt auslesen und als finale URL behandeln. Die Abstraktion stellt sicher, dass der v1→v2-Speicherwechsel ausschließlich in dieser Funktion stattfindet — ohne API-Kontrakt- oder Frontend-Änderung.
+
+**Stil-Präfix — Unsichtbarkeit für Nutzer.**
+Der globale Stil-Präfix aus `app_image_style_presets` wird ausschließlich serverseitig in `images.py` vor den Nutzer-Prompt konkateniert. Er wird niemals im API-Response zurückgegeben. Der vollständige Prompt (inkl. Präfix) wird nicht geloggt — nur die Prompt-Länge. Wenn zukünftiger Code den finalen Prompt zurückgeben oder loggen muss, ist das eine bewusste Entscheidung, die in SECURITY.md dokumentiert werden muss.
+
+**Status-Spalte als Finanz-Integritätsmuster — insert-before-provider-call.**
+Immer wenn ein externer Provider-Call Kosten verursachen kann, wird ein Stub-Record mit `status='pending'` **vor** dem Call in die DB geschrieben. Nach dem Call: `status='succeeded'` + Kosten eintragen, oder `status='failed'` (keine Kosten). Nur `succeeded`-Records zählen in Kostensummen und gegen Limits. Dieses Muster gilt für Bildgenerierung und sollte auf alle zukünftigen kostenpflichtigen Provider-Calls ausgeweitet werden.
+
+**Slash-Command-Konvention (v2 — nicht aktiv in v1).**
+Der `/bild`-Slash-Command wurde aus v1 herausgenommen (Frontend-Parser entfernt). Die Konvention bleibt für v2 gültig: Slash-Commands werden mit case-insensitiver Regex erkannt (`/i`-Flag). Das Muster erfordert mindestens ein Nicht-Leerzeichen nach dem Command-Wort: `^\/bild\s+\S` / `^\/image\s+\S`. Ein Command ohne Inhalt löst keinen API-Call aus, sondern zeigt einen Tooltip-Hinweis. Neue Slash-Commands müssen dasselbe case-insensitive + Mindest-Inhalt-Pattern verwenden.
+
 ### 2026-05-12 — Supabase-Pattern: count + last-row in einer Query
 
 **Problem:** Wenn man für eine Liste von Eltern-Datensätzen gleichzeitig die Anzahl der Kind-Datensätze und den neuesten Kind-Datensatz braucht, liegt die naive Lösung bei zwei separaten Queries — oder bei `select("id", count="exact")`, das alle IDs überträgt, nur um `len(result.data)` aufzurufen.

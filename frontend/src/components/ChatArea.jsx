@@ -50,6 +50,9 @@ export default function ChatArea({
             model={m.model}
             sources={m.sources}
             imageSources={m.image_sources}
+            generated_image_id={m.generated_image_id}
+            image_url={m.image_url}
+            prompt={m.prompt}
           />
         ))}
 

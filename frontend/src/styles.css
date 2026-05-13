@@ -1828,6 +1828,15 @@ body {
   margin-bottom: 16px;
 }
 
+.admin-success {
+  background: #e6f4ea;
+  color: #1e6e35;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
 /* ── Admin Table ── */
 
 .admin-table {
@@ -3917,6 +3926,292 @@ body {
   color: var(--color-text-light);
 }
 
+/* ── Bilder Studio ── */
+
+.bilder-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 32px 48px;
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  overflow-y: auto;
+  gap: 24px;
+}
+
+.bilder-container h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-dark);
+  margin: 0;
+}
+
+.bilder-budget-banner {
+  background: var(--color-gray-light);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.bilder-budget-remaining {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.bilder-form {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bilder-form-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.bilder-textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.bilder-char-count {
+  font-size: 11px;
+  color: var(--color-text-light);
+  margin-top: 4px;
+}
+
+.bilder-char-count--over {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+.bilder-no-models {
+  font-size: 13px;
+  color: var(--color-text-light);
+  padding: 10px 0;
+}
+
+.bilder-generating-label {
+  font-size: 13px;
+  color: var(--color-text-light);
+  font-style: italic;
+}
+
+.bilder-gallery-section {
+  flex: 1;
+}
+
+.bilder-gallery {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.bilder-gallery-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--color-text-light);
+  font-size: 15px;
+  background: var(--color-gray-light);
+  border-radius: 12px;
+  border: 1px dashed var(--color-border);
+}
+
+.bilder-card {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-gray-light);
+  display: flex;
+  flex-direction: column;
+}
+
+.bilder-card-thumb-btn {
+  display: block;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+}
+
+.bilder-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform var(--transition);
+}
+
+.bilder-card:hover .bilder-card-img {
+  transform: scale(1.03);
+}
+
+.bilder-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: var(--color-white);
+  border-top: 1px solid var(--color-border);
+}
+
+.bilder-card-caption {
+  font-size: 11px;
+  color: var(--color-text-light);
+  padding: 0 8px 8px;
+  line-height: 1.4;
+}
+
+/* Preview modal */
+
+.bilder-image-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bilder-preview-img {
+  width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: #f0f0f0;
+}
+
+.bilder-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bilder-metadata-row {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.bilder-metadata-label {
+  font-weight: 600;
+  color: var(--color-text-light);
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.bilder-metadata-value {
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+/* Chat image wrappers (used by sibling MessageBubble agent) */
+
+.message-image-wrapper {
+  margin: 8px 0;
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.message-image {
+  display: block;
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.message-image-caption {
+  font-size: 11px;
+  color: var(--color-text-light);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.message-image-download {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.message-image-wrapper:hover .message-image-download {
+  opacity: 1;
+}
+
+.message-image-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 220px;
+  height: 160px;
+  background: var(--color-gray-light);
+  border: 1px dashed var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-text-light);
+  text-align: center;
+  padding: 16px;
+}
+
+/* Admin Bildmodelle form */
+
+.admin-bildmodelle-form {
+  background: var(--color-gray-light);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.admin-bildmodelle-form .form-row {
+  margin-bottom: 8px;
+}
+
+/* Admin Bild-Stil form */
+
+.admin-bild-stil-form {
+  background: var(--color-gray-light);
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.admin-bild-stil-form .form-row {
+  margin-bottom: 8px;
+}
+
+/* Admin Kosten Bild section */
+
+.admin-kosten-bild-section {
+  margin-top: 8px;
+  padding-top: 24px;
+  border-top: 2px solid var(--color-border);
+}
+
 /* ── Responsive ── */
 
 /* On narrow viewports the persistent sidebar becomes a drawer overlay so the
@@ -3943,5 +4238,24 @@ body {
   .input-controls {
     flex-wrap: wrap;
     gap: 8px;
+  }
+
+  .bilder-container {
+    padding: 16px;
+  }
+
+  .bilder-gallery {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bilder-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 480px) {
+  .bilder-gallery {
+    grid-template-columns: 1fr;
   }
 }

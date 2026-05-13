@@ -197,6 +197,25 @@ Tabelle prüfen, ob neue Migration sie versehentlich an anon vergeben hat.
 
 ---
 
+### Bildgenerierung — Provider-URLs, Prompts und Stil-Präfix
+
+**Provider-URLs sind temporär öffentlich.** OpenAI- und xAI-Bildgenerierungs-Antworten liefern direkte CDN-URLs zurück. Diese URLs sind ohne Authentifizierung abrufbar und laufen nach ca. 60 Minuten ab. Wer die URL kennt, kann das Bild in diesem Zeitfenster abrufen. Die URL wird in `app_generated_images.image_url` gespeichert; Zugriff darauf ist nur über das Backend möglich (kein direkter DB-Zugriff von außen).
+
+Konsequenz: Generierte Bilder sind für die Lebensdauer der URL effektiv öffentlich, auch wenn der Nutzer kein Sharing beabsichtigt hat. Nutzer sollten darüber informiert werden (Hinweis in der ANWENDER-DOKUMENT.md vorhanden). In v2 werden Bilder in Supabase Storage mit Access-Control abgelegt; der Wechsel ist ohne API-Änderung möglich (`storage_kind`-Discriminator in `image_storage.py`).
+
+**Prompts werden nicht im Audit-Log gespeichert.** Der vollständige Prompt-Text (inklusive Stil-Präfix) wird nicht in `app_audit_logs` eingetragen — nur Prompt-Länge, Nutzer-ID und Modell-ID. Das schützt vor versehentlichem Logging sensibler Prompt-Inhalte. Falls spätere Compliance-Anforderungen Prompt-Archivierung erfordern, muss dies explizit ergänzt werden.
+
+**Stil-Präfix — akzeptiertes Risiko.** Der globale Stil-Präfix aus `app_image_style_presets` wird serverseitig vor den Nutzer-Prompt gesetzt. Ein kompromittierter Admin-Account könnte über den Präfix gezielt den Nutzer-Prompt manipulieren (Prompt-Injection vom Admin-Layer). Das ist ein akzeptiertes Risiko im Trust-Modell: Admins sind vertrauenswürdig; der Präfix ist für Admins im Dashboard sichtbar, aber nicht für Nutzer. Wenn das Trust-Modell sich ändert (z. B. delegierte Admins mit eingeschränkten Rechten), muss der Präfix-Mechanismus neu bewertet werden.
+
+**Provider-seitige Moderation** ist in v1 der einzige Content-Gate. OpenAI und xAI lehnen gegen ihre Policy verstoßende Prompts auf ihrer Seite ab. Eine eigene Guardrail-Schicht (Llama Guard, Azure Prompt Shields) ist geplant (TODO Abschnitt „Input-/Output-Guardrails"), aber in v1 nicht vorhanden.
+
+**Geplante Härtung (v2):**
+- Supabase Storage mit ACL als permanenter Bild-Store (ersetzt temporäre Provider-URLs)
+- Optionale Guardrail-Schicht vor dem Provider-Call (Prompt-Klassifikation)
+- Prompt-Archivierung als Admin-Toggle (opt-in, da datenschutzrelevant)
+
+---
+
 ## Inzident-Historie
 
 | Datum | Befund | Schweregrad | Behoben in |

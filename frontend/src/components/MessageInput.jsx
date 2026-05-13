@@ -54,8 +54,9 @@ export default function MessageInput({
 
   function handleSubmit(e) {
     e.preventDefault()
-    if (!message.trim() || loading) return
-    onSend(message.trim())
+    const trimmed = message.trim()
+    if (!trimmed || loading) return
+    onSend(trimmed)
     setMessage('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
   }

@@ -25,6 +25,15 @@ CHAT_MESSAGE_SEND = "chat.message.send"
 
 DOCUMENT_UPLOAD_DEDUP_SKIPPED = "document.upload.dedup_skipped"
 
+IMAGE_GENERATE = "image.generate"
+IMAGE_GENERATE_FAILED = "image.generate.failed"
+IMAGE_GENERATE_MODERATION_BLOCKED = "image.generate.moderation_blocked"
+IMAGE_DELETE = "image.delete"
+ADMIN_IMAGE_STYLE_PRESET_CREATE = "admin.image_style_preset.create"
+ADMIN_IMAGE_STYLE_PRESET_UPDATE = "admin.image_style_preset.update"
+ADMIN_IMAGE_STYLE_PRESET_DELETE = "admin.image_style_preset.delete"
+ADMIN_USER_LIMIT_UPDATE = "admin.user.limit_update"
+
 
 def log_event(
     action: str,

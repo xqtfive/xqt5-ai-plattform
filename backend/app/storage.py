@@ -72,7 +72,7 @@ def get_conversation(conversation_id: str) -> Optional[Dict[str, Any]]:
     conv = conv_result.data[0]
     msg_result = (
         supabase.table("chat_messages")
-        .select("*")
+        .select("*, app_generated_images(image_url, storage_kind, provider_url_expires_at, status)")
         .eq("chat_id", conversation_id)
         .order("created_at")
         .execute()
@@ -80,12 +80,17 @@ def get_conversation(conversation_id: str) -> Optional[Dict[str, Any]]:
 
     messages: List[Dict[str, Any]] = []
     for msg in msg_result.data:
-        messages.append({
+        img_data = msg.pop("app_generated_images", None)
+        message: Dict[str, Any] = {
             "role": msg["role"],
             "content": msg["content"],
             "model": msg.get("model"),
             "sources": msg.get("rag_sources") or None,
-        })
+        }
+        if img_data:
+            message["generated_image"] = img_data
+            message["image_url"] = img_data.get("image_url")
+        messages.append(message)
 
     return {
         "id": conv["id"],

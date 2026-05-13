@@ -763,6 +763,237 @@ export const api = {
     return response.json()
   },
 
+  // ── Image Generation ──
+
+  /**
+   * Generate an image.
+   * @param {{prompt: string, model: string, parameters?: object, source?: string, chat_id?: string, pool_chat_id?: string}} opts
+   * @returns {Promise<object>} image record
+   */
+  async generateImage({ prompt, model, parameters, source, chat_id, pool_chat_id } = {}, { signal } = {}) {
+    const body = { prompt, model, source: source || 'studio' }
+    if (parameters) body.parameters = parameters
+    if (chat_id) body.chat_id = chat_id
+    if (pool_chat_id) body.pool_chat_id = pool_chat_id
+    const response = await authFetch(`${API_BASE}/api/images/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(extractDetail(err, 'Bildgenerierung fehlgeschlagen'))
+    }
+    return response.json()
+  },
+
+  /**
+   * List generated images for the current user.
+   * @param {{limit?: number, offset?: number}} opts
+   * @returns {Promise<{images: object[], total: number}>}
+   */
+  async listGeneratedImages({ limit = 20, offset = 0 } = {}) {
+    const response = await authFetch(
+      `${API_BASE}/api/images?limit=${limit}&offset=${offset}`
+    )
+    if (!response.ok) throw new Error('Konnte Bilder nicht laden')
+    return response.json()
+  },
+
+  /**
+   * Delete a generated image by ID.
+   * @param {string} image_id
+   * @returns {Promise<boolean>}
+   */
+  async deleteGeneratedImage(image_id) {
+    const response = await authFetch(`${API_BASE}/api/images/${image_id}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) throw new Error('Konnte Bild nicht löschen')
+    return true
+  },
+
+  // ── Image Models (Admin) ──
+
+  /**
+   * List image models. Wraps /api/admin/models with model_type=image filter.
+   * @returns {Promise<object[]>}
+   */
+  async adminListImageModels() {
+    const response = await authFetch(`${API_BASE}/api/admin/models?model_type=image`)
+    if (!response.ok) throw new Error('Konnte Bildmodelle nicht laden')
+    return response.json()
+  },
+
+  /**
+   * Create an image model. Merges model_type='image' into body.
+   * @param {object} data
+   * @returns {Promise<object>}
+   */
+  async adminCreateImageModel(data) {
+    const { cost_per_image, ...rest } = data
+    const body = { ...rest, model_type: 'image' }
+    if (cost_per_image !== undefined && cost_per_image !== '' && cost_per_image !== null) {
+      body.pricing = { type: 'fixed', cost_per_image_usd: Number(cost_per_image) }
+    }
+    const response = await authFetch(`${API_BASE}/api/admin/models`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(extractDetail(err, 'Konnte Bildmodell nicht erstellen'))
+    }
+    return response.json()
+  },
+
+  /**
+   * Update an image model by ID.
+   * @param {string|number} id
+   * @param {object} data
+   * @returns {Promise<object>}
+   */
+  async adminUpdateImageModel(id, data) {
+    const response = await authFetch(`${API_BASE}/api/admin/models/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) throw new Error('Konnte Bildmodell nicht aktualisieren')
+    return response.json()
+  },
+
+  /**
+   * Delete an image model by ID.
+   * @param {string|number} id
+   * @returns {Promise<object>}
+   */
+  async adminDeleteImageModel(id) {
+    const response = await authFetch(`${API_BASE}/api/admin/models/${id}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) throw new Error('Konnte Bildmodell nicht löschen')
+    return response.json()
+  },
+
+  // ── Image Style Presets (Admin) ──
+
+  /**
+   * List all image style presets.
+   * @returns {Promise<object[]>}
+   */
+  async adminListImageStylePresets() {
+    const response = await authFetch(`${API_BASE}/api/admin/image-style-presets`)
+    if (!response.ok) throw new Error('Konnte Stil-Präfixe nicht laden')
+    return response.json()
+  },
+
+  /**
+   * Create an image style preset.
+   * @param {object} data
+   * @returns {Promise<object>}
+   */
+  async adminCreateImageStylePreset(data) {
+    const response = await authFetch(`${API_BASE}/api/admin/image-style-presets`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(extractDetail(err, 'Konnte Stil-Präfix nicht erstellen'))
+    }
+    return response.json()
+  },
+
+  /**
+   * Update an image style preset by ID.
+   * @param {string|number} id
+   * @param {object} data
+   * @returns {Promise<object>}
+   */
+  async adminUpdateImageStylePreset(id, data) {
+    const response = await authFetch(`${API_BASE}/api/admin/image-style-presets/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) throw new Error('Konnte Stil-Präfix nicht aktualisieren')
+    return response.json()
+  },
+
+  /**
+   * Delete an image style preset by ID.
+   * @param {string|number} id
+   * @returns {Promise<object>}
+   */
+  async adminDeleteImageStylePreset(id) {
+    const response = await authFetch(`${API_BASE}/api/admin/image-style-presets/${id}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) throw new Error('Konnte Stil-Präfix nicht löschen')
+    return response.json()
+  },
+
+  // ── User Limits (Admin) ──
+
+  /**
+   * Update per-user limits (e.g. daily image budget).
+   * @param {string} user_id
+   * @param {object} data  e.g. { daily_image_limit_usd: 1.00 }
+   * @returns {Promise<object>}
+   */
+  async adminUpdateUserLimits(user_id, data) {
+    const response = await authFetch(`${API_BASE}/api/admin/users/${user_id}/limits`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      throw new Error(extractDetail(err, 'Konnte Nutzerlimits nicht aktualisieren'))
+    }
+    return response.json()
+  },
+
+  // ── Image Usage (Admin) ──
+
+  /**
+   * Get image generation usage statistics.
+   * @param {{start_date?: string, end_date?: string}} opts
+   * @returns {Promise<{summary: object, by_user: object[], by_model: object[]}>}
+   */
+  async adminGetImageUsage({ start_date, end_date } = {}) {
+    const params = new URLSearchParams()
+    if (start_date) params.set('start_date', start_date)
+    if (end_date) params.set('end_date', end_date)
+    const query = params.toString()
+    const response = await authFetch(
+      `${API_BASE}/api/admin/images/usage${query ? '?' + query : ''}`
+    )
+    if (!response.ok) throw new Error('Konnte Bild-Nutzungsdaten nicht laden')
+    return response.json()
+  },
+
+  // ── Image Budget (current user) ──
+
+  /**
+   * Get the current user's image budget for today.
+   * Returns null if the endpoint does not exist (optional feature).
+   * @returns {Promise<{used_today_usd: number, daily_limit_usd: number|null, remaining_usd: number|null}|null>}
+   */
+  async getImageBudget() {
+    try {
+      const response = await authFetch(`${API_BASE}/api/images/budget`)
+      if (!response.ok) return null
+      return response.json()
+    } catch {
+      return null
+    }
+  },
+
   // Streaming (existing)
   async sendMessageStream(id, content, model, temperature, imageMode, onDelta, onDone, onError) {
     const response = await authFetch(`${API_BASE}/api/conversations/${id}/message`, {

@@ -170,8 +170,15 @@ def get_system_stats() -> Dict[str, Any]:
 # ── Model Config CRUD ──
 
 
-def list_model_configs() -> List[Dict[str, Any]]:
-    result = supabase.table("app_model_config").select("*").order("sort_order").order("model_id").execute()
+def list_model_configs(model_type: str = "chat") -> List[Dict[str, Any]]:
+    result = (
+        supabase.table("app_model_config")
+        .select("*")
+        .eq("model_type", model_type)
+        .order("sort_order")
+        .order("model_id")
+        .execute()
+    )
     return result.data
 
 
@@ -181,15 +188,20 @@ def create_model_config(
     display_name: str,
     sort_order: int = 0,
     deployment_name: Optional[str] = None,
+    model_type: str = "chat",
+    pricing: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     row: Dict[str, Any] = {
         "model_id": model_id,
         "provider": provider,
         "display_name": display_name,
         "sort_order": sort_order,
+        "model_type": model_type,
     }
     if deployment_name:
         row["deployment_name"] = deployment_name
+    if pricing is not None:
+        row["pricing"] = pricing
     result = supabase.table("app_model_config").insert(row).execute()
     return result.data[0]
 
@@ -200,9 +212,13 @@ def update_model_config(config_id: str, **fields: Any) -> Optional[Dict[str, Any
     if not update_data:
         return None
 
-    # If setting a new default, unset all others first (unconditional — no boolean filter)
+    # If setting a new default, unset all others of the SAME model_type only.
+    # Fetching the row first ensures we scope the reset correctly and do not
+    # accidentally clear the default for a different model type (e.g. image vs chat).
     if update_data.get("is_default") is True:
-        supabase.table("app_model_config").update({"is_default": False}).neq("id", config_id).execute()
+        current_row = supabase.table("app_model_config").select("model_type").eq("id", config_id).execute()
+        current_type = (current_row.data[0]["model_type"] if current_row.data else "chat")
+        supabase.table("app_model_config").update({"is_default": False}).neq("id", config_id).eq("model_type", current_type).execute()
 
     result = supabase.table("app_model_config").update(update_data).eq("id", config_id).execute()
     if not result.data:
@@ -210,12 +226,12 @@ def update_model_config(config_id: str, **fields: Any) -> Optional[Dict[str, Any
     return result.data[0]
 
 
-def get_default_model_id() -> Optional[str]:
-    """Return the model_id marked as default in app_model_config, or None."""
+def get_default_model_id(model_type: str = "chat") -> Optional[str]:
+    """Return the model_id marked as default in app_model_config for the given model_type, or None."""
     try:
         result = supabase.table("app_model_config").select("model_id").eq(
             "is_default", True
-        ).eq("is_enabled", True).limit(1).execute()
+        ).eq("model_type", model_type).eq("is_enabled", True).limit(1).execute()
         if result.data:
             return result.data[0]["model_id"]
     except Exception:

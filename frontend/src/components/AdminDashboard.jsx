@@ -8,7 +8,9 @@ const TABS = [
   { id: 'costs', label: 'Kosten' },
   { id: 'stats', label: 'Statistiken' },
   { id: 'retrieval', label: 'Retrieval' },
-  { id: 'models', label: 'Modelle' },
+  { id: 'models', label: t('admin.chatmodelle.tab.label') },
+  { id: 'bildmodelle', label: t('admin.bildmodelle.tab.label') },
+  { id: 'bild_stil', label: t('admin.bild_stil.tab.label') },
   { id: 'providers', label: 'Provider' },
   { id: 'audit', label: 'Audit-Logs' },
 ]
@@ -43,6 +45,8 @@ export default function AdminDashboard({ onClose, currentUser }) {
         {activeTab === 'stats' && <StatsTab />}
         {activeTab === 'retrieval' && <RetrievalTab />}
         {activeTab === 'models' && <ModelsTab />}
+        {activeTab === 'bildmodelle' && <BildmodelleTab />}
+        {activeTab === 'bild_stil' && <BildStilTab />}
         {activeTab === 'providers' && <ProvidersTab />}
         {activeTab === 'audit' && <AuditTab />}
       </div>
@@ -170,6 +174,7 @@ function UsersTab({ currentUser }) {
 
 function CostsTab() {
   const [data, setData] = useState(null)
+  const [imageData, setImageData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState('')
@@ -183,8 +188,12 @@ function CostsTab() {
     setLoading(true)
     setError('')
     try {
-      const result = await api.adminGetUsage(start, end)
-      setData(result)
+      const [tokenResult, imageResult] = await Promise.all([
+        api.adminGetUsage(start, end),
+        api.adminGetImageUsage({ start_date: start, end_date: end }).catch(() => null),
+      ])
+      setData(tokenResult)
+      setImageData(imageResult)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -362,6 +371,88 @@ function CostsTab() {
           )}
         </tbody>
       </table>
+
+      {/* ── Bild-Kosten ── */}
+      <section className="admin-kosten-bild-section">
+        <h2 className="admin-section-title" style={{ marginTop: 32, fontSize: 18 }}>
+          {t('admin.kosten.bild.heading')}
+        </h2>
+
+        {imageData ? (
+          <>
+            {imageData.summary && (
+              <div className="admin-cards" style={{ marginBottom: 16 }}>
+                <div className="admin-card">
+                  <div className="admin-card-label">{t('admin.kosten.bild.total')}</div>
+                  <div className="admin-card-value">
+                    ${(imageData.summary.total_cost_usd ?? 0).toFixed(4)}
+                  </div>
+                </div>
+                {imageData.summary.total_images != null && (
+                  <div className="admin-card">
+                    <div className="admin-card-label">Bilder generiert</div>
+                    <div className="admin-card-value">
+                      {imageData.summary.total_images.toLocaleString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <h3 className="admin-section-title">{t('admin.kosten.bild.per_user')}</h3>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Bilder</th>
+                  <th>Kosten (USD)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(imageData.by_user || []).map((u) => (
+                  <tr key={u.user_id || u.username}>
+                    <td>{u.username || u.user_id}</td>
+                    <td>{(u.image_count ?? u.count ?? 0).toLocaleString()}</td>
+                    <td>${(u.cost_usd ?? u.estimated_cost ?? 0).toFixed(4)}</td>
+                  </tr>
+                ))}
+                {(imageData.by_user || []).length === 0 && (
+                  <tr><td colSpan="3" className="admin-empty-cell">Keine Daten</td></tr>
+                )}
+              </tbody>
+            </table>
+
+            <h3 className="admin-section-title" style={{ marginTop: 16 }}>
+              {t('admin.kosten.bild.per_model')}
+            </h3>
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Modell</th>
+                  <th>Bilder</th>
+                  <th>Kosten (USD)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(imageData.by_model || []).map((m) => (
+                  <tr key={m.model}>
+                    <td><code>{m.model}</code></td>
+                    <td>{(m.image_count ?? m.count ?? 0).toLocaleString()}</td>
+                    <td>${(m.cost_usd ?? m.estimated_cost ?? 0).toFixed(4)}</td>
+                  </tr>
+                ))}
+                {(imageData.by_model || []).length === 0 && (
+                  <tr><td colSpan="3" className="admin-empty-cell">Keine Daten</td></tr>
+                )}
+              </tbody>
+            </table>
+          </>
+        ) : (
+          <div className="admin-empty-cell" style={{ padding: '24px 0', textAlign: 'left' }}>
+            Keine Bild-Kostendaten verfügbar — Endpunkt noch nicht konfiguriert.
+          </div>
+        )}
+      </section>
     </div>
   )
 }
@@ -1144,6 +1235,428 @@ function ProvidersTab() {
           </div>
         ))}
       </div>
+    </div>
+  )
+}
+
+function BildmodelleTab() {
+  const confirm = useConfirm()
+  const [models, setModels] = useState([])
+  const [error, setError] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({
+    provider: '',
+    model_id: '',
+    display_name: '',
+    cost_per_image: '',
+    sort_order: 0,
+  })
+
+  useEffect(() => {
+    loadModels()
+  }, [])
+
+  async function loadModels() {
+    try {
+      const data = await api.adminListImageModels()
+      setModels(data)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleCreate(e) {
+    e.preventDefault()
+    setError('')
+    setSuccessMsg('')
+    try {
+      const payload = { ...form }
+      if (payload.cost_per_image !== '') payload.cost_per_image = parseFloat(payload.cost_per_image)
+      else delete payload.cost_per_image
+      await api.adminCreateImageModel(payload)
+      setForm({ provider: '', model_id: '', display_name: '', cost_per_image: '', sort_order: 0 })
+      setShowForm(false)
+      await loadModels()
+      setSuccessMsg(t('admin.bildmodelle.add.success'))
+      setTimeout(() => setSuccessMsg(''), 3000)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function handleSetDefault(id) {
+    setError('')
+    try {
+      await api.adminUpdateImageModel(id, { is_default: true })
+      await loadModels()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function handleToggle(id, field, value) {
+    setError('')
+    try {
+      await api.adminUpdateImageModel(id, { [field]: value })
+      await loadModels()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function handleDelete(id) {
+    const ok = await confirm({
+      title: 'Bildmodell löschen?',
+      message: 'Dieses Modell steht danach nicht mehr zur Auswahl.',
+      confirmLabel: 'Löschen',
+      destructive: true,
+    })
+    if (!ok) return
+    setError('')
+    setSuccessMsg('')
+    try {
+      await api.adminDeleteImageModel(id)
+      await loadModels()
+      setSuccessMsg(t('admin.bildmodelle.delete.success'))
+      setTimeout(() => setSuccessMsg(''), 3000)
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  if (loading) return <div className="admin-loading">Laden...</div>
+
+  return (
+    <div>
+      <h3 className="admin-section-title">{t('admin.bildmodelle.heading')}</h3>
+      {error && <div className="admin-error">{error}</div>}
+      {successMsg && <div className="admin-success">{successMsg}</div>}
+
+      <button
+        className="btn btn-primary btn-small"
+        onClick={() => setShowForm(!showForm)}
+        style={{ marginBottom: 16 }}
+      >
+        {showForm ? 'Abbrechen' : t('admin.bildmodelle.add.button')}
+      </button>
+
+      {showForm && (
+        <form className="admin-bildmodelle-form" onSubmit={handleCreate}>
+          <div className="form-row">
+            <div className="form-group">
+              <label>{t('admin.bildmodelle.column.provider')}</label>
+              <input
+                className="form-input"
+                placeholder="z.B. openai"
+                value={form.provider}
+                onChange={(e) => setForm({ ...form, provider: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>{t('admin.bildmodelle.column.model_id')}</label>
+              <input
+                className="form-input"
+                placeholder="z.B. dall-e-3"
+                value={form.model_id}
+                onChange={(e) => setForm({ ...form, model_id: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>Display Name</label>
+              <input
+                className="form-input"
+                placeholder="Anzeigename"
+                value={form.display_name}
+                onChange={(e) => setForm({ ...form, display_name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>{t('admin.bildmodelle.column.cost_per_image')}</label>
+              <input
+                className="form-input"
+                type="number"
+                min="0"
+                step="0.0001"
+                placeholder="0.0400"
+                value={form.cost_per_image}
+                onChange={(e) => setForm({ ...form, cost_per_image: e.target.value })}
+              />
+            </div>
+          </div>
+          <button
+            className="btn btn-primary btn-small"
+            type="submit"
+            disabled={!form.provider || !form.model_id}
+          >
+            Hinzufügen
+          </button>
+        </form>
+      )}
+
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>{t('admin.bildmodelle.column.model_id')}</th>
+            <th>{t('admin.bildmodelle.column.provider')}</th>
+            <th>Display Name</th>
+            <th>{t('admin.bildmodelle.column.cost_per_image')}</th>
+            <th>Aktiviert</th>
+            <th>{t('admin.bildmodelle.column.default')}</th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {models.map((m) => (
+            <tr key={m.id}>
+              <td><code>{m.model_id}</code></td>
+              <td>{m.provider}</td>
+              <td>{m.display_name}</td>
+              <td>{m.pricing?.cost_per_image_usd != null ? `$${m.pricing.cost_per_image_usd}` : '-'}</td>
+              <td>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={m.is_enabled}
+                    onChange={() => handleToggle(m.id, 'is_enabled', !m.is_enabled)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </td>
+              <td>
+                {m.is_default ? (
+                  <span style={{ color: 'var(--color-primary)', fontWeight: 600, fontSize: 13 }}>
+                    Standard
+                  </span>
+                ) : (
+                  <button className="btn btn-secondary btn-small" onClick={() => handleSetDefault(m.id)}>
+                    {t('admin.bildmodelle.action.set_default')}
+                  </button>
+                )}
+              </td>
+              <td>
+                <button className="btn btn-danger btn-small" onClick={() => handleDelete(m.id)}>
+                  Löschen
+                </button>
+              </td>
+            </tr>
+          ))}
+          {models.length === 0 && (
+            <tr>
+              <td colSpan="7" className="admin-empty-cell">{t('admin.bildmodelle.empty')}</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function BildStilTab() {
+  const confirm = useConfirm()
+  const [presets, setPresets] = useState([])
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState({ name: '', prefix: '', is_active: true })
+
+  useEffect(() => {
+    loadPresets()
+  }, [])
+
+  async function loadPresets() {
+    try {
+      const data = await api.adminListImageStylePresets()
+      setPresets(data)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function startEdit(preset) {
+    setEditingId(preset.id)
+    setForm({ name: preset.name || '', prefix: preset.prefix || '', is_active: !!preset.is_active })
+    setShowForm(true)
+  }
+
+  function cancelForm() {
+    setShowForm(false)
+    setEditingId(null)
+    setForm({ name: '', prefix: '', is_active: true })
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    try {
+      if (editingId) {
+        await api.adminUpdateImageStylePreset(editingId, form)
+      } else {
+        await api.adminCreateImageStylePreset(form)
+      }
+      cancelForm()
+      await loadPresets()
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
+  async function handleDelete(id) {
+    const ok = await confirm({
+      title: 'Stil-Präfix löschen?',
+      message: 'Dieser Präfix wird dauerhaft entfernt.',
+      confirmLabel: 'Löschen',
+      destructive: true,
+    })
+    if (!ok) return
+    setError('')
+    try {
+      await api.adminDeleteImageStylePreset(id)
+      await loadPresets()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  async function handleToggleActive(preset) {
+    setError('')
+    try {
+      await api.adminUpdateImageStylePreset(preset.id, { is_active: !preset.is_active })
+      await loadPresets()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
+  if (loading) return <div className="admin-loading">Laden...</div>
+
+  return (
+    <div>
+      <h3 className="admin-section-title">{t('admin.bild_stil.heading')}</h3>
+      <p style={{ color: 'var(--color-text-light)', fontSize: 13, marginBottom: 16 }}>
+        {t('admin.bild_stil.hint')}
+      </p>
+      {error && <div className="admin-error">{error}</div>}
+
+      <button
+        className="btn btn-primary btn-small"
+        onClick={() => { setShowForm(!showForm); setEditingId(null); setForm({ name: '', prefix: '', is_active: true }) }}
+        style={{ marginBottom: 16 }}
+      >
+        {showForm && !editingId ? 'Abbrechen' : 'Präfix hinzufügen'}
+      </button>
+
+      {showForm && (
+        <form className="admin-bild-stil-form" onSubmit={handleSubmit}>
+          <div className="form-row">
+            <div className="form-group">
+              <label>{t('admin.bild_stil.field.name')}</label>
+              <input
+                className="form-input"
+                placeholder="z.B. Corporate Style"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                required
+              />
+            </div>
+          </div>
+          <div className="form-group">
+            <label>{t('admin.bild_stil.field.prefix')}</label>
+            <textarea
+              className="form-input form-textarea"
+              placeholder="z.B. Corporate photography style, clean white background, professional lighting, "
+              value={form.prefix}
+              onChange={(e) => setForm({ ...form, prefix: e.target.value })}
+              maxLength={1000}
+              required
+              rows={3}
+            />
+            <span className="form-hint">{form.prefix.length} / 1000</span>
+          </div>
+          <div className="form-group">
+            <label className="form-checkbox">
+              <input
+                type="checkbox"
+                checked={form.is_active}
+                onChange={() => setForm({ ...form, is_active: !form.is_active })}
+              />
+              {t('admin.bild_stil.field.active')}
+            </label>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-small" type="submit">
+              {editingId ? 'Speichern' : 'Hinzufügen'}
+            </button>
+            {editingId && (
+              <button className="btn btn-secondary btn-small" type="button" onClick={cancelForm}>
+                Abbrechen
+              </button>
+            )}
+          </div>
+        </form>
+      )}
+
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>{t('admin.bild_stil.field.name')}</th>
+            <th>{t('admin.bild_stil.field.prefix')}</th>
+            <th>{t('admin.bild_stil.field.active')}</th>
+            <th>Aktionen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {presets.map((p) => (
+            <tr key={p.id}>
+              <td>{p.name}</td>
+              <td style={{ maxWidth: 320 }}>
+                <span
+                  title={p.prefix}
+                  style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                >
+                  {p.prefix}
+                </span>
+              </td>
+              <td>
+                <label className="toggle-switch">
+                  <input
+                    type="checkbox"
+                    checked={!!p.is_active}
+                    onChange={() => handleToggleActive(p)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
+              </td>
+              <td>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="btn btn-secondary btn-small" onClick={() => startEdit(p)}>
+                    Bearbeiten
+                  </button>
+                  <button className="btn btn-danger btn-small" onClick={() => handleDelete(p.id)}>
+                    Löschen
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          {presets.length === 0 && (
+            <tr>
+              <td colSpan="4" className="admin-empty-cell">Noch keine Stil-Präfixe konfiguriert</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   )
 }

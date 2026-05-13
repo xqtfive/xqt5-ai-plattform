@@ -29,11 +29,13 @@ Es gliedert sich in folgende Tabs:
 | Tab | Inhalt |
 |-----|--------|
 | Übersicht | Systemstatistiken, aktive Nutzer, Dokumentanzahl |
-| Benutzer | Nutzerverwaltung, Rollen, Aktivierung |
-| Modelle | Modellkatalog, Default-Modell, Aktivierung |
+| Benutzer | Nutzerverwaltung, Rollen, Aktivierung, Tageslimits |
+| Chatmodelle | Chat-Modellkatalog, Default-Chatmodell, Aktivierung |
+| Bildmodelle | Bild-Modellkatalog, Default-Bildmodell, Aktivierung |
+| Bild-Stil | Globale Stil-Präfixe für Bildgenerierung |
 | Provider | API-Keys verwalten, Endpoint-Konfiguration |
 | Retrieval | RAG-Einstellungen, Embedding-Provider, Rechunking |
-| Kosten | Nutzungsauswertung nach Modell und Provider |
+| Kosten | Nutzungsauswertung nach Modell und Provider; Bild-Kosten |
 | Audit | Audit-Log aller administrativen Aktionen |
 
 ---
@@ -64,6 +66,8 @@ Benötigte Keys je Funktion:
 | Embeddings (Azure) | Azure OpenAI |
 | OCR (PDF/Bild-Dokumente) | Mistral |
 | Automatische Zusammenfassung | je nach Default-Modell |
+| Bildgenerierung (OpenAI) | OpenAI (derselbe Key wie Chat) |
+| Bildgenerierung (xAI) | xAI (derselbe Key wie Chat) |
 
 ### 4.2 Modelle aktivieren und konfigurieren
 
@@ -253,4 +257,56 @@ graph TB
 - **Nutzer deaktivieren**: Alle aktiven Sessions werden sofort invalidiert — der Nutzer wird beim nächsten Request ausgeloggt.
 - **PGRST203 / 42P13**: Bei PostgreSQL-Funktionen mit geänderter Signatur oder geändertem Return-Type ist erst `DROP FUNCTION` nötig, bevor `CREATE OR REPLACE` funktioniert.
 - **Mammouth temperature**: Mammouth-Modelle unterstützen keinen `temperature`-Parameter. Der Parameter wird intern automatisch weggelassen — kein manuelles Eingreifen nötig.
+- **Bildmodelle Default**: `is_default` für `model_type='image'` und `model_type='chat'` ist unabhängig. Das Setzen eines neuen Chat-Defaults berührt das Bild-Default nicht und umgekehrt.
+
+---
+
+## 10. Bildmodelle, Bild-Stil und Bild-Kosten verwalten
+
+### 10.1 Bildmodell registrieren
+
+Bildgenerierungs-Modelle verwenden denselben API-Key wie der jeweilige Chat-Provider. Vor dem Registrieren eines Bildmodells sicherstellen, dass der Provider-Key im Tab **Provider** hinterlegt ist.
+
+1. Admin-Dashboard → Tab **Bildmodelle**
+2. **Neues Modell hinzufügen**:
+   - **Provider** wählen (OpenAI oder xAI für v1)
+   - **Modell-ID** eintragen (z. B. `dall-e-3`, `aurora` — exakter API-Bezeichner des Providers)
+   - **Display Name** anpassen (wird Nutzern im Bilder-Tab angezeigt)
+   - **Preis-Metadaten** eintragen (wird für Kostenverfolgung genutzt; kein hardcodierter Wert im Code)
+   - **Aktiviert**-Schalter setzen
+3. **Default setzen**: „Als Standard"-Button klicken. Das Bild-Default ist unabhängig vom Chat-Default.
+
+> **Wichtig nach dem Erst-Deploy:** Ohne mindestens ein aktives Bildmodell mit gesetztem Default schlagen alle Bilder-Tab-Anfragen mit einem Konfigurationsfehler fehl. Den Deploy-Smoke-Test nicht überspringen. (Der `/bild`-Slash-Command ist v2 — nicht in v1 aktiv.)
+
+### 10.2 Standard-Bildmodell ändern
+
+Im Tab **Bildmodelle** neben dem gewünschten Modell auf **Als Standard setzen** klicken. Das bisherige Standard-Modell verliert den Default-Status automatisch — ohne das Chat-Default-Modell zu beeinflussen.
+
+### 10.3 Globalen Stil-Präfix konfigurieren
+
+Ein Stil-Präfix wird unsichtbar vor jeden Nutzer-Prompt gesetzt. Nutzer sehen ihn nicht; er erscheint nur hier im Admin-Dashboard.
+
+1. Tab **Bild-Stil** öffnen
+2. Im Feld **Globaler Präfix** den gewünschten Text eintragen (z. B. Marken-Stilvorgaben, Content-Policy-Hinweise)
+3. **Speichern** klicken
+
+Leerstring = kein Präfix. Der Präfix wird mit einem Leerzeichen vor dem Nutzer-Prompt konkateniert.
+
+### 10.4 Tägliches Kostenlimit pro Nutzer setzen
+
+Das System-weite Standard-Tageslimit stammt aus `app_settings` (Auslieferungsstandard: $5/Tag, anpassbar). Pro Nutzer kann ein abweichendes Limit gesetzt werden:
+
+1. Tab **Benutzer** → Nutzer auswählen → **Limits bearbeiten**
+2. **Tägliches Bild-Kostenlimit (USD)** eintragen (leer = System-Default verwenden)
+3. **Speichern**
+
+> **Selbstschutz:** Ein Admin kann das eigene Limit nicht ändern. Der Versuch wird mit einem Hinweis abgelehnt. Dieser Schutz ist serverseitig erzwungen (`admin.py`), nicht nur im UI.
+
+### 10.5 Bild-Kosten einsehen
+
+Tab **Kosten** → Bereich **Bild-Kosten**: Aufstellung der generierten Bilder nach Datum, Nutzer, Modell und Kosten in USD. Nur `succeeded`-Records werden angezeigt und in die Summen eingerechnet.
+
+### 10.6 Audit-Log für Bildgenerierung
+
+Im Tab **Audit** erscheinen Einträge mit den Actions `image.generate` und `image.generate.failed`. Jeder Eintrag enthält Nutzer-ID, Modell-ID, Prompt-Länge (nicht den Prompt-Text selbst) und Kosten. Pool-Kontext (Chat-ID) ist im Metadaten-Feld enthalten.
 - **Default-Modell**: Immer nur ein Modell kann Default sein. Das Setzen eines neuen Defaults entfernt den alten automatisch. Ist kein Default gesetzt, greifen Backend-Fallbacks (erst `DEFAULT_MODEL` Env-Var, dann erstes verfügbares Modell).

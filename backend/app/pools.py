@@ -463,17 +463,17 @@ def get_pool_chat(chat_id: str) -> Optional[Dict[str, Any]]:
         return None
     chat = chat_result.data[0]
 
-    # Load messages
+    # Load messages with image enrichment via LEFT JOIN
     msg_result = (
         supabase.table("pool_chat_messages")
-        .select("*")
+        .select("*, app_generated_images(image_url, storage_kind, provider_url_expires_at, status)")
         .eq("chat_id", chat_id)
         .order("created_at")
         .execute()
     )
     chat["messages"] = msg_result.data or []
 
-    # Enrich messages with username and map rag_sources → sources
+    # Enrich messages with username, rag_sources → sources, and flatten image data
     user_cache = {}
     for msg in chat["messages"]:
         uid = msg.get("user_id")
@@ -484,6 +484,10 @@ def get_pool_chat(chat_id: str) -> Optional[Dict[str, Any]]:
             msg["username"] = user_cache.get(uid, "Unknown")
         if msg.get("rag_sources"):
             msg["sources"] = msg["rag_sources"]
+        img_data = msg.pop("app_generated_images", None)
+        if img_data:
+            msg["generated_image"] = img_data
+            msg["image_url"] = img_data.get("image_url")
 
     return chat
 

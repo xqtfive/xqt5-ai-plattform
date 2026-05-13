@@ -679,4 +679,109 @@ Der Sort-Key in allen drei betroffenen Listen ist `last_message_at || created_at
 - Dokument-Datumsanzeige in PoolOverview unverändert (`created_at`).
 - Kein Message-Insert-Trigger — die gesamte Logik liegt im Appcode.
 
+---
+
+## Bildgenerierung — Text-to-Image mit OpenAI + xAI (2026-05-13)
+
+### Motivation
+
+Nutzer benötigen die Möglichkeit, Bilder direkt aus dem AI-Workspace heraus zu erzeugen — sowohl in einem dedizierten Studio-Tab als auch situativ per Slash-Command mitten im Chat. Die Plattform nutzt bereits API-Keys für OpenAI und xAI; beide Provider bieten stabile Bildgenerierungs-Endpunkte. Damit ist kein neuer Credentials-Overhead erforderlich.
+
+### Architektur
+
+Der einzige Backend-Endpunkt für Bildgenerierung ist `POST /api/images/generate`. In v1 wird er ausschließlich vom **Bilder-Tab** in der NavRail aufgerufen. Der `/bild`-/`/image`-Slash-Command ist auf v2 verschoben (Grund: die Chat-Nachricht–Bild-Verlinkung ist im v1-Storage-Layer nicht verdrahtet; `generated_image_id` auf `chat_messages` existiert in der DB, wird aber vom Frontend nicht befüllt). Der Endpunkt liefert denselben Response-Typ unabhängig vom späteren Einstiegspunkt.
+
+**Provider-Abstraktion:** Das neue Modul `backend/app/image_gen.py` übernimmt die gleiche Rolle wie `llm.py` für Chat: Es mappt einen konfigurierten `app_model_config`-Eintrag auf den richtigen Provider-Client und kapselt das jeweilige Request-/Response-Format. Das neue Modul `backend/app/image_storage.py` abstrahiert den physischen Speicherort: `resolve_image_url(record)` gibt je nach `storage_kind`-Feld im DB-Record die richtige URL zurück. In v1 ist `storage_kind = 'provider_url'` und die URL stammt direkt vom Provider. In v2 wird `storage_kind = 'supabase'` ergänzt — die Funktion ist der einzige Ort, der geändert werden muss.
+
+### Datenmodell
+
+Drei neue Tabellen:
+
+| Tabelle | Zweck |
+|---|---|
+| `app_generated_images` | Ein Record pro Generierungsversuch; enthält `status`, `prompt`, `cost_usd`, `image_url`, `storage_kind`, `generated_image_id` (FK auf `chat_messages` oder `pool_chat_messages`) |
+| `app_image_style_presets` | Stil-Präfixe; `scope_type` enum: `'global'` / `'team'` / `'user'` / `'pool'`; v1 nur `'global'` befüllt |
+| `app_user_limits` | Pro-User-Override-Tabelle; `daily_image_cost_usd` überschreibt den System-Default aus `app_settings` |
+
+Zwei Spalten-Ergänzungen an `app_model_config`:
+
+- `model_type varchar` — Werte: `'chat'`, `'image'`, `'embedding'`; extensibel ohne Schema-Änderung
+- `pricing jsonb` — kostenrelevante Metadaten; keine hartkodierten Preise, Admin registriert sie beim Anlegen des Modells
+
+Zwei Spalten-Ergänzungen an `chat_messages` und `pool_chat_messages`:
+
+- `generated_image_id uuid` (FK auf `app_generated_images.id`) — verknüpft eine Chat-Nachricht mit dem erzeugten Bild
+
+### Status-Spalte und finanzielle Integrität
+
+`app_generated_images.status` nimmt drei Werte an: `'pending'` → `'succeeded'` / `'failed'`. Der Stub-Record mit `status='pending'` wird **vor** dem Provider-Call in die DB geschrieben. Erst wenn der Provider erfolgreich antwortet, wird der Record auf `'succeeded'` gesetzt und `cost_usd` eingetragen. Nur `succeeded`-Records zählen zum Tageslimit. Schlägt der Provider-Call fehl, bleibt der Record auf `'failed'` — keine Kosten werden angerechnet. Dieses Muster verhindert, dass ein unerwarteter Programmabbruch zwischen Kostenanfall beim Provider und dem DB-Write zu ungetrackt verbrauchten Kosten führt.
+
+### Kostenverfolgung und Tageslimit
+
+Das tägliche Kostenlimit pro Nutzer wird aus `app_user_limits.daily_image_cost_usd` gelesen; fehlt ein Eintrag, greift der System-Default aus `app_settings` (konfigurierbar, Auslieferungsstandard: $5/Tag). Das Limit ist eine weiche Grenze — der Backend-Endpunkt prüft vor jedem Generate-Call die Summe der `succeeded`-Records des laufenden UTC-Tages und lehnt ab, wenn die Grenze erreicht ist.
+
+Der Admin-Endpunkt `PUT /api/admin/users/{id}/limits` ist mit Selbstschutz versehen: Ein Admin kann die eigenen Limits nicht verändern. Der Versuch wird mit HTTP 403 abgelehnt.
+
+### Pool-Integration
+
+Bilder, die über den Bilder-Tab generiert werden, sind immer dem erzeugenden Nutzer zugeordnet. Der geplante Pool-Chat-Kontext (Sichtbarkeit nach `is_shared`) ist für v2 vorgesehen, wenn der Slash-Command-Pfad verdrahtet wird.
+
+### Slash-Command-Verhalten (v2 — nicht in v1)
+
+> **v2-Scope.** Der `/bild`-Slash-Command ist aus v1 herausgenommen. Das Frontend-Parsing (`MessageInput.jsx`, `PoolChatArea.jsx`), die App.jsx-Handler (`handleGenerateImageInChat`, `handleGenerateImageInPoolChat`) und der `poolChatRefreshKey`-Mechanismus sind entfernt. Wiederherstellung in v2 erfordert: (a) beim Generieren mit `chat_id`/`pool_chat_id` auch eine `chat_messages`-Zeile mit gesetztem `generated_image_id` einfügen; (b) Entscheidung über Message-Struktur (einzelne Assistenten-Nachricht vs. User+Assistant-Paar); (c) Frontend-Slash-Parser in `MessageInput.jsx` und `PoolChatArea.jsx` wiederherstellen; (d) App.jsx-Handler und ChatArea/PoolDetail-Prop-Threading wiederherstellen; (e) i18n-Key `chat.slash.image.help` wiederherstellen.
+>
+> Die ursprüngliche Beschreibung (case-insensitive Regex, Mindest-Inhalt-Pattern, Tooltip bei leerem Befehl) war korrekt entworfen und gilt unverändert für v2.
+
+### Stil-Präfix
+
+Globale Stil-Presets (`scope_type='global'`) werden als unsichtbarer Prompt-Präfix vor den Nutzer-Prompt gesetzt. Der Nutzer sieht den Präfix nicht; er erscheint nur im Admin-Dashboard (Bild-Stil-Tab). Die Scope-Hierarchie im Datenmodell (`global` / `team` / `user` / `pool`) ermöglicht spätere Verfeinerung ohne Schema-Migration.
+
+### Korrektheit-Fix in `admin.py:204-205`
+
+Vor diesem Feature konnte das Setzen eines neuen Chat-Default-Modells versehentlich das Image-Default-Modell zurücksetzen, weil der `is_default`-Reset ohne `model_type`-Filter lief. Die Zeilen `admin.py:204-205` wurden korrigiert: Das `UPDATE ... SET is_default = false`-Statement filtert jetzt auf `model_type = <type des neuen Default>`, sodass Chat-Default-Änderungen das Bild-Default unberührt lassen und umgekehrt.
+
+### Storage-Strategie
+
+v1: Provider-URLs werden direkt in `app_generated_images.image_url` gespeichert; `storage_kind = 'provider_url'`. OpenAI- und xAI-URLs sind ca. 60 Minuten gültig. `image_storage.resolve_image_url()` gibt die URL unverändert zurück.
+
+v2 (geplant): Supabase Storage als permanenter Speicher; `storage_kind = 'supabase'`. Das API-Kontrakt und das Frontend-Rendering ändern sich dabei nicht — nur `resolve_image_url()` wird erweitert.
+
+### Anti-Scope (nicht Teil dieses Deploys)
+
+- Keine Bild-zu-Bild-Bearbeitung, kein Inpainting
+- Google Imagen — verschoben auf v2 (abhängt von Supabase Storage)
+- Kein Pro-Pool-Galerie-Tab
+- Kein Scheduling / Batch-Generierung
+- Kein Wasserzeichen
+- Keine Multi-Währungs-Kostenansicht
+- Kein `/bild`-Command in öffentlichen Einladungslinks
+
+### Berührte Dateien
+
+**Backend:**
+- `backend/app/image_gen.py` — neu; Provider-Abstraktion für Bildgenerierung
+- `backend/app/image_storage.py` — neu; URL-Auflösung nach `storage_kind`
+- `backend/app/images.py` — neu; FastAPI-Router mit `POST /api/images/generate`
+- `backend/app/admin.py` — Zeilen 204-205 korrigiert; neue Endpunkte für Bildmodelle, Bild-Stil, Nutzerlimits
+- `supabase/migrations/20260513_a_image_generation.sql` — neu; 3 Tabellen + 2×2 Spalten, vollständig idempotent
+
+**Frontend:**
+- `frontend/src/components/BilderTab.jsx` — neu; Bilder-Studio-Tab
+- `frontend/src/components/AdminDashboard.jsx` — Bildmodelle-Tab, Bild-Stil-Tab, Bild-Kosten-Sektion, Chatmodelle-Umbenennung
+- `frontend/src/App.jsx` — Bilder-NavRail-Eintrag (Slash-Command-Handler in v2 verschoben)
+- `frontend/src/components/MessageBubble.jsx` — dormante `<img>`-Rendering-Branch für generierte Bilder (v1: nie aktiv, da kein Chat-Slash-Command; v2 re-aktiviert sie)
+- `frontend/src/styles/images.css` — Bilder-Tab- und Galerie-Styles
+
+**Docs:** 8 Dateien (IMPLEMENTIERT, UMSETZUNGS-DOKUMENT, ADMIN-DOKUMENT, ANWENDER-DOKUMENT, FEATURE-DOKUMENT, SECURITY, CODING-DOKUMENT, PROD-UPGRADE-PLAYBOOK, TODO)
+
+### Manueller Deploy-Schritt
+
+1. Migration `20260513_a_image_generation.sql` gegen die Supabase-Instanz ausführen.
+2. Backend deployen.
+3. Frontend deployen.
+4. Im Admin-Dashboard: mindestens ein Bildmodell in **Bildmodelle** registrieren und als Default setzen.
+5. Optional: globalen Stil-Präfix im Tab **Bild-Stil** eintragen.
+
+Details siehe `docs/PROD-UPGRADE-PLAYBOOK.md` — Abschnitt „Bildgenerierung".
+
 Dateien: `frontend/src/App.jsx`, `frontend/src/components/PoolDetail.jsx`

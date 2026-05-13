@@ -331,6 +331,41 @@ Mindestens eine Datei jedes neuen Formats (`.md`, `.csv`, `.docx`, `.xlsx`, `.xl
 
 ---
 
+## Bildgenerierung — Migration und Deploy (2026-05-13)
+
+### Reihenfolge
+
+1. **Migration ausführen**: `supabase/migrations/20260513_a_image_generation.sql` gegen die Prod-Supabase-Instanz laufen lassen (via `supabase-meta /pg/query` oder Supabase-Dashboard SQL-Editor).
+2. **Backend deployen**: Coolify triggert Rebuild aus dem neuen Commit.
+3. **Frontend deployen**: Coolify triggert Rebuild des Frontend-Service.
+
+### Migration — Idempotenz
+
+Die Migration ist vollständig idempotent (`CREATE TABLE IF NOT EXISTS`, `ADD COLUMN IF NOT EXISTS`). Sie kann ohne Auswirkungen mehrfach ausgeführt werden. Kein `DROP` in dieser Migration — alle Änderungen sind additiv. Bestehende Tabellen (`app_model_config`, `chat_messages`, `pool_chat_messages`) erhalten nur neue Spalten; keine bestehende Spalte wird geändert.
+
+### Post-Deploy-Admin-Schritte (obligatorisch)
+
+Ohne diese Schritte ist die Bildgenerierung nicht nutzbar:
+
+1. Admin-Dashboard → Tab **Bildmodelle** → mindestens ein Modell registrieren (z. B. OpenAI `dall-e-3`).
+2. Das neue Modell als Default setzen.
+3. Optional: Tab **Bild-Stil** → globalen Stil-Präfix eintragen.
+
+### Smoke-Tests nach Deploy
+
+| Test | Erwartetes Ergebnis |
+|---|---|
+| Bilder-Tab öffnen und Prompt absenden | Bild erscheint in der Galerie; kein 500-Fehler im Backend-Log |
+| Admin → Kosten → Bild-Kosten | Mindestens ein Eintrag mit `succeeded`-Status und `cost_usd > 0` |
+| Admin → Audit | Einträge mit Action `image.generate` sichtbar |
+| Eigenes Nutzerlimit über Admin versuchen zu ändern | HTTP 403, Fehlermeldung im UI |
+
+### Rollback
+
+Vor dem Commit das Tag `git tag pre-image-gen` setzen (nur lesen, kein Push — User-Aufgabe). Bei schwerwiegendem Fehler nach dem Deploy: `git reset --hard pre-image-gen` und neu pushen. Die neuen Tabellen (`app_generated_images`, `app_image_style_presets`, `app_user_limits`) und die neuen Spalten an bestehenden Tabellen bleiben in der DB — sie enthalten dann schlimmstenfalls leere Daten. Da alle Änderungen additiv sind, funktioniert der alte Code weiterhin korrekt neben den neuen leeren Tabellen.
+
+---
+
 ## Notfall-Kontakte / Eskalation
 
 (Hier bei Bedarf eintragen wer im Notfall zuständig ist und wie erreichbar.)

@@ -137,7 +137,30 @@ flowchart TD
     E --> F["Zitat aufklappen (Seite + Textauszug)"]
 ```
 
-### 5.5 Pools (Geteilte Wissenssammlungen)
+### 5.5 Bildgenerierung
+
+Die Plattform ermöglicht das Erzeugen von Bildern aus Textbeschreibungen (Text-to-Image) über den **Bilder-Tab** in der NavRail.
+
+**Bilder-Tab (Studio):**
+In der NavRail das Bilder-Icon anklicken. Im Eingabefeld den Prompt eingeben und auf **Generieren** klicken. Das Ergebnis erscheint in der Galerie unterhalb des Eingabefelds und bleibt dort gespeichert.
+
+**Prompt-Tipps:**
+- Konkrete, beschreibende Sprache liefert bessere Ergebnisse als abstrakte Begriffe.
+- Stilangaben wie „fotorealistisch", „Aquarell" oder „flache Illustration" steuern das Erscheinungsbild.
+- Der Admin kann unsichtbare Stil-Präfixe gesetzt haben, die Corporate-Vorgaben einbetten.
+
+**Herunterladen:**
+Jedes Bild in der Galerie hat eine Download-Schaltfläche.
+
+**Einschränkungen:**
+- Provider-URLs (OpenAI, xAI) sind ca. 60 Minuten gültig. Danach ist das Vorschau-Bild in der Galerie nicht mehr direkt sichtbar; der Download-Link bleibt erreichbar solange die URL gilt.
+- Es gibt ein tägliches Kostenlimit (vom Admin konfiguriert). Bei Erreichen des Limits wird der Generate-Button deaktiviert und ein Hinweis angezeigt.
+- Bild-zu-Bild-Bearbeitung und Inpainting sind nicht verfügbar.
+- Der `/bild`-Slash-Command im Chat ist für v2 geplant und in v1 nicht verfügbar.
+
+Fragen zur Konfiguration (verfügbare Modelle, Tageslimits) beantwortet die [Admin-Dokumentation](./ADMIN-DOKUMENT.md), Abschnitt 10.
+
+### 5.6 Pools (Geteilte Wissenssammlungen)
 
 - Pool erstellen (Name, Beschreibung, Icon, Farbe)
 - Mitglieder per Username hinzufügen
@@ -167,7 +190,14 @@ flowchart LR
 
 ## 6. Typische Arbeitsabläufe
 
-### 6.1 Wissensarbeit mit eigenen Dokumenten
+### 6.1 Bild im Bilder-Tab generieren
+
+1. NavRail → Bilder-Icon
+2. Prompt eingeben
+3. **Generieren** klicken
+4. Bild in der Galerie herunterladen
+
+### 6.2 Wissensarbeit mit eigenen Dokumenten
 
 1. Neue Konversation starten
 2. Relevante Dokumente hochladen (Fortschrittsbalken abwarten)
@@ -176,7 +206,7 @@ flowchart LR
 5. Antwort inkl. Quellen prüfen — Zitat aufklappen für genauen Textabschnitt und Seitenangabe
 6. Optional Assistent/Template ergänzen
 
-### 6.2 Team-Wissensraum mit Pools
+### 6.3 Team-Wissensraum mit Pools
 
 1. Pool erstellen
 2. Mitglieder einladen (Rolle festlegen)

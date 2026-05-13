@@ -752,6 +752,30 @@ Drei kleine i18n-Patches an Pool-Komponenten beheben englisch-in-deutscher-UI-Re
 - **`DocumentList`** — englischer Tooltip `title="Remove document"` → `t('doc.action.delete')` (= `Dokument löschen`, passt zur projektweiten „löschen"-Konvention); englischer Fallback `${chunk_count} chunks` → `${chunk_count} ${t('doc.chunks')}`.
 - **Pool-Rolle-Badge** — `t(\`pool.header.role.${role || 'viewer'}\`)`-Pattern (Fallback gegen `undefined`) jetzt konsistent über `Sidebar.jsx` (2 Stellen), `PoolList.jsx`, `PoolMembers.jsx`, `PoolShareDialog.jsx` ausgerollt. PoolOverview.jsx hatte das Pattern schon; jetzt sieht der/die Nutzer:in überall `Eigentümer:in` / `Administrator:in` / `Bearbeiter:in` / `Betrachter:in` statt rohem `owner`/`admin`/`editor`/`viewer`. **Wichtig:** Das Fallback `|| 'viewer'` ist nicht kosmetisch — ohne ihn würde `t('pool.header.role.undefined')` den Key wörtlich zurückgeben, was als sichtbarer Müll auf der UI auftauchen würde.
 
+## Bildgenerierung-Architektur (umgesetzt 2026-05-13)
+
+Vollständige Implementierungsdetails: `docs/IMPLEMENTIERT.md` — Abschnitt „Bildgenerierung".
+
+### Endpunkt-Topologie
+
+Ein einzelner Backend-Endpunkt `POST /api/images/generate` bedient in v1 ausschließlich den **Bilder-Tab**. Das Backend ist bereits für einen zweiten Einstiegspunkt (Slash-Command) vorbereitet — der `source`-Parameter akzeptiert `'studio'`, `'chat_slash'` und `'pool_chat_slash'`; die Werte `chat_slash`/`pool_chat_slash` werden in v1 vom Frontend nicht gesendet. Der `/bild`-Slash-Command ist auf v2 verschoben (Grund: Chat-Nachricht–Bild-Verlinkung im Storage-Layer nicht verdrahtet).
+
+### `app_model_config.model_type` — Erweiterbarkeit
+
+Die neue Spalte `model_type varchar` (Werte: `'chat'`, `'image'`, `'embedding'`) macht das Modell-Routing im Backend deterministisch ohne hartcodierte Modellnamen. Neue Typen (z. B. `'tts'`, `'video'`) können in der DB registriert werden, ohne eine Schema-Migration zu erzwingen — `varchar` ist bewusst kein Enum-Typ. Der `is_default`-Mechanismus in `admin.py` setzt nur Records desselben `model_type` zurück (Korrektheit-Fix Zeilen 204-205).
+
+### Storage-Abstraktion
+
+`image_storage.resolve_image_url(record: dict) -> str` ist der einzige Punkt, der weiß, wo ein Bild physisch liegt. v1: `storage_kind = 'provider_url'` — gibt `record["image_url"]` unverändert zurück. v2: `storage_kind = 'supabase'` — baut eine Signed URL gegen Supabase Storage. Das API-Kontrakt (`image_url` im Response) und das Frontend-Rendering bleiben identisch; der v1→v2-Wechsel erfordert ausschließlich Backend-Änderungen.
+
+### Status-Spalte als Finanz-Integritätsmuster
+
+Das `pending → succeeded / failed`-Muster aus `app_generated_images.status` ist das neue Standardmuster für alle zukünftigen Features, bei denen ein externer Kostenanfall und ein DB-Write zeitlich auseinanderfallen können. Stub-Record zuerst — dann Provider-Call — dann Status-Update. Nur `succeeded` zählt.
+
+### Stil-Preset-Hierarchie
+
+`app_image_style_presets.scope_type` folgt einer Überschreibungs-Hierarchie: `global` < `team` < `user` < `pool`. In v1 ist ausschließlich `global` befüllt. Die Hierarchie ist im Datenmodell abgebildet, damit spätere Erweiterungen (team/user/pool) keine Schema-Änderung erfordern. Präfixe sind für Nutzer unsichtbar; sie erscheinen nur im Admin-Dashboard.
+
 ## Nächste Umsetzungsschritte
 - **Map-Reduce-Zusammenfassung**: Dokument-für-Dokument-Zusammenfassung + Combine-Schritt (baut auf Targeted Retrieval auf)
 - **Weitere Dokumentformate**: `.doc`, `.ppt`, `.pptx` — geparkt bis OCR-Pipeline v2 (Docling)

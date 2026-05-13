@@ -58,6 +58,68 @@ const STRINGS = {
       'OCR und Indexierung laufen — der Inhalt ist gleich verfügbar',
     'doc.action.delete': 'Dokument löschen',
     'doc.chunks': 'Chunks',
+
+    // ── Navigation ──
+    'nav.bilder.label': 'Bilder',
+
+    // ── Bilder-Tab ──
+    'bilder.heading': 'Bilder generieren',
+    'bilder.form.prompt.label': 'Prompt',
+    'bilder.form.prompt.placeholder': 'Beschreibe das gewünschte Bild...',
+    'bilder.form.prompt.hint': 'max. 2000 Zeichen, empfohlen unter 1500',
+    'bilder.form.model.label': 'Modell',
+    'bilder.form.model.placeholder': 'Modell wählen...',
+    'bilder.form.no_models': 'Kein Bildmodell konfiguriert — bitte Admin kontaktieren',
+    'bilder.button.generate': 'Generieren',
+    'bilder.button.cancel': 'Abbrechen',
+    'bilder.status.generating': 'Wird generiert...',
+    'bilder.gallery.empty': 'Noch keine generierten Bilder',
+    'bilder.image.download': 'Herunterladen',
+    'bilder.image.copy_prompt': 'Prompt kopieren',
+    'bilder.image.delete': 'Löschen',
+    'bilder.image.delete.confirm.title': 'Bild löschen?',
+    'bilder.image.delete.confirm.message': 'Diese Aktion kann nicht rückgängig gemacht werden.',
+    'bilder.image.preview.title': 'Bildvorschau',
+    'bilder.budget.limit': 'Tageslimit',
+    'bilder.budget.remaining': 'verbleibend',
+    'bilder.gallery.loading': 'Laden...',
+    'bilder.gallery.load_more': 'Mehr laden',
+    'bilder.image.created_label': 'Erstellt',
+
+    // ── Chat image strings (dormant in v1; used by MessageBubble image branch, restored in v2) ──
+    'chat.image.placeholder': 'Bild wird generiert...',
+    'chat.image.unavailable': 'Bild nicht mehr verfügbar — bitte neu generieren',
+    'chat.image.regenerate': 'Erneut generieren',
+
+    // ── Admin: renamed Chatmodelle tab ──
+    'admin.chatmodelle.tab.label': 'Chatmodelle',
+
+    // ── Admin: Bildmodelle tab ──
+    'admin.bildmodelle.tab.label': 'Bildmodelle',
+    'admin.bildmodelle.heading': 'Bildmodelle verwalten',
+    'admin.bildmodelle.column.provider': 'Provider',
+    'admin.bildmodelle.column.model_id': 'Modell-ID',
+    'admin.bildmodelle.column.cost_per_image': 'Kosten pro Bild (USD)',
+    'admin.bildmodelle.column.default': 'Standard',
+    'admin.bildmodelle.action.set_default': 'Als Standard setzen',
+    'admin.bildmodelle.empty': 'Noch keine Bildmodelle konfiguriert',
+    'admin.bildmodelle.add.button': 'Modell hinzufügen',
+    'admin.bildmodelle.add.success': 'Bildmodell hinzugefügt',
+    'admin.bildmodelle.delete.success': 'Bildmodell gelöscht',
+
+    // ── Admin: Bild-Stil tab ──
+    'admin.bild_stil.tab.label': 'Bild-Stil',
+    'admin.bild_stil.heading': 'Globaler Bild-Stil-Präfix',
+    'admin.bild_stil.hint': 'Wird unsichtbar vor jedem Prompt eingefügt. Maximal 1000 Zeichen.',
+    'admin.bild_stil.field.name': 'Name',
+    'admin.bild_stil.field.prefix': 'Stil-Präfix',
+    'admin.bild_stil.field.active': 'Aktiv',
+
+    // ── Admin: Kosten — Bild section ──
+    'admin.kosten.bild.heading': 'Bild-Kosten',
+    'admin.kosten.bild.total': 'Gesamt Bilder-Kosten',
+    'admin.kosten.bild.per_user': 'Pro Nutzer',
+    'admin.kosten.bild.per_model': 'Pro Modell',
   },
   en: {
     // Placeholder for future English translations. Until populated, t() falls
