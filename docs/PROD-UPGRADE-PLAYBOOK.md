@@ -323,7 +323,7 @@ Mindestens eine Datei jedes neuen Formats (`.md`, `.csv`, `.docx`, `.xlsx`, `.xl
 
 ### 9d. Phase-3-Observability-Log
 
-`backend/app/rag.py` enthält ein `phase3=true`-Logging-Statement (Zeilen ~1354–1378), das auf dev für die Verifikationsmatrix gebraucht wird. Vor dem Prod-Cutover entscheiden: (a) auf prod auch behalten (mehr Log-Volume aber gleiche Verifikationsdaten), (b) auf prod auf `DEBUG`-Level downgraden, oder (c) ganz entfernen. Memory `project_xqt5_todo.md` Task #63 trackt die Entfernung als Phase-3.4-Schritt.
+`backend/app/rag.py` enthält ein `phase3=true`-Logging-Statement (Zeilen ~1354–1378) als stehende RAG-Beobachtungs-Telemetrie. Ehemals als „temporär bis Matrix-Sign-off" markiert; Verifikationsmatrix ist 2026-05-13 geparkt (siehe `docs/PHASE3-MATRIX-SHELVED.md`). Vor dem Prod-Cutover entscheiden: (a) auf prod auch behalten — Default-Empfehlung, gleiche Beobachtungs-Daten, kein PII (Doc-IDs + Scores, keine Prompts), (b) auf prod auf `DEBUG`-Level downgraden, oder (c) ganz entfernen. Wenn behalten: Log-Volume im Auge behalten, ggf. mit Coolify-Log-Rotation kombinieren.
 
 ### 9e. Versionsobergrenzen in `pyproject.toml`
 

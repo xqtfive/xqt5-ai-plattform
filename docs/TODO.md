@@ -21,7 +21,7 @@ Quelle: `basline-code/rag-vrm/shared/{progress,hashing,config}.py`, `ocr-benchma
 
 - [x] ✅ **Content-Hash-basiertes Skip beim Upload (A1)** — geliefert 2026-05-06, dev-Migration angewendet; Details in `IMPLEMENTIERT.md` „Content-Hash Upload-Deduplikation (A1, 2026-05-06)". **Offen:** Re-Embed-Skip beim nächtlichen Job (Teil 6.4) und prod-Migration.
 
-- [x] ✅ **Bild-Deduplizierung per pHash (A2)** — Code geliefert 2026-05-06, Details in `IMPLEMENTIERT.md` „Bild-pHash Deduplikation (A2, 2026-05-06)". **Offen:** dev- und prod-Migration `20260506_c_asset_phash_recurring.sql` anwenden; Cross-Document-Dedup (tenant-scoped phash-Index) als Future-Work.
+- [x] ✅ **Bild-Deduplizierung per pHash (A2)** — Code + Migration vollständig auf DEV angewendet (verifiziert 2026-05-13: Spalten, Index, RPC-Filter `AND a.recurring = FALSE` in allen drei Branches). **PROD:** komplett ausstehend, wartet auf prod-catchup-Track. Cross-Document-Dedup (tenant-scoped phash-Index) als Future-Work. Details: `IMPLEMENTIERT.md` „Bild-pHash Deduplikation (A2, 2026-05-06)".
 
 - [ ] 🟠 **VLM-Inferenz-Cache** (Bild-Hash → Beschreibung, derselbe Hash wie oben wiederverwendbar)
   - Vor jedem VLM-Call: Cache-Lookup auf `content_hash`. Bei Miss: VLM aufrufen, Beschreibung speichern. TTL ∞ (Bild-Hash deterministisch, Modell-ID Teil des Cache-Keys)
@@ -53,6 +53,13 @@ Quelle: `basline-code/rag-vrm/shared/{progress,hashing,config}.py`, `ocr-benchma
   - Vollständiger Plan inkl. 4 kritischer Review-Pässe in `docs/SERVICEMELDUNGEN-PLAN-SHELVED.md`
   - Implementation-Team war designed (4 Impl + 2 Verify Agents), aber nicht gespawned
   - Wiederaufnahme: das Shelved-Doc lesen, Codebase-Drift seit 2026-05-12 prüfen, dann das Team spawnen
+
+- [ ] 🟡 **Phase-3.1-Verifikationsmatrix + RAG-Inspektion-Panel** (geparkt 2026-05-13)
+  - Architekt bevorzugt manuelles RAG-Testing gegenüber formalisierter Matrix
+  - Geparkt: sechs-Test-Matrix (A–F), `MATRIX-RUNBOOK.md` (nie angelegt), Admin-UI-Panel für RAG-Inspektion, strukturiertes `event=rag_trace`-Logging, `RAGTrace`-Dataclass-Refactor, Pre-Fusion-Rank-Capture, Per-Doc-Cap, Privacy-Mitigationen am `phase3=true`-Log
+  - Bleibt aktiv: Testkorpus unter `docs/tests/phase3/corpus/` (Musterbau + Rheintal + 5 Aux), `phase3=true`-Stdout-Log
+  - Vollständiger Plan + Wiederaufnahme-Checkliste in `docs/PHASE3-MATRIX-SHELVED.md`
+  - **Mögliche zukünftige Wiederaufnahme via versteckter Admin/Dev-Sandbox** (Idee 2026-05-13, nicht beschlossen): nicht-verlinkter URL-/Tastenkürzel-Trigger, Sandbox-Modus ohne Persistenz, Live-Trace als Response. Würde `SECURITY.md:209` nicht berühren weil nichts logged wird. Details: `PHASE3-MATRIX-SHELVED.md` Abschnitt „Mögliche zukünftige Variante".
 
 ---
 

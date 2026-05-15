@@ -8,6 +8,8 @@ app/config.py
 app/database.py
 app/documents.py
 app/encryption.py
+app/image_gen.py
+app/image_storage.py
 app/llm.py
 app/main.py
 app/models.py

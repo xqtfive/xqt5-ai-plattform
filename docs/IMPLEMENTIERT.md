@@ -162,7 +162,7 @@ Verhindert, dass dasselbe Logo, der Briefkopf oder ein wiederkehrendes Header-Bi
 - Migration `supabase/migrations/20260506_c_asset_phash_recurring.sql`: `phash TEXT` und `recurring BOOLEAN NOT NULL DEFAULT FALSE` auf `app_document_assets`, plus partieller Index `(document_id, phash) WHERE phash IS NOT NULL`. `match_document_assets`-RPC mit unverändertem Signaturen-Layout neu definiert (3-Branch IF/ELSIF/ELSE pool/chat/global), in jedem Branch Filter `AND a.recurring = FALSE`
 - Neue Python-Dependencies `Pillow>=10.0.0` und `imagehash>=4.3.1` in `pyproject.toml` und `Dockerfile` pip-install-Zeile (manylinux-wheels verfügbar, kein apt-get nötig auf python:3.11-slim)
 - **Cross-Document-Dedup ist ausdrücklich nicht implementiert** — würde tenant-scoped phash-Index oder kanonische Asset-Tabelle benötigen, ist als Future-Work in `docs/TODO.md` zu vermerken
-- **Status:** Code zum Commit fertig; Migration noch nicht angewendet (gleicher Workflow wie A1: paste-in-Studio auf dev, dann prod nach Bedarf)
+- **Status (verifiziert 2026-05-13):** Code geliefert; Migration **vollständig auf DEV angewendet** — Spalten `phash` und `recurring` existieren, partieller Index `idx_app_document_assets_doc_phash` aktiv, RPC `match_document_assets` enthält den `AND a.recurring = FALSE`-Filter in allen drei Branches (Pool/Chat/Global) per `pg_get_functiondef`-Probe verifiziert. PROD: nichts angewendet, wartet auf prod-catchup-Track.
 
 Dateien: `supabase/migrations/20260506_c_asset_phash_recurring.sql`, `backend/app/documents.py`, `backend/pyproject.toml`, `backend/Dockerfile`
 
@@ -296,7 +296,7 @@ Dateien: `frontend/public/favicon.svg` (neu), `frontend/index.html`
 
 Temporäres Logging zur Verifikation der Multi-Dok-Bias- und RRF-Sortier-Fixes. Nach jedem erfolgreich gepackten Chunk schreibt `build_rag_context()` einen `phase3=true`-Eintrag mit `{id, doc, idx, sim, rrf, rerank, tok, neighbor}` für jeden Chunk, der ins Token-Budget gepasst hat. Dadurch ist post-hoc nachweisbar, ob die Sortierung tatsächlich Chunks aus mehreren Dokumenten ins Budget bringt und welcher Score (vektor-similarity, RRF, oder Cohere-Rerank) die Reihenfolge bestimmt hat.
 
-Geplante Entfernung: nach Abschluss der Phase-3.1-Verifikationsmatrix. Das Log ist explizit mit dem Marker `phase3=true` getaggt, damit ein simpler Grep den Entfernungspunkt findet.
+**Status (2026-05-13):** Verifikationsmatrix geparkt — siehe `docs/PHASE3-MATRIX-SHELVED.md`. Der Log bleibt unverändert als stehende RAG-Beobachtungs-Telemetrie für manuelle Inspektion via Coolify-Log-Filter `phase3=true`. Ehemals geplante Entfernung „nach Matrix-Sign-off" entfällt; Entfernung erst bei späterem strukturiertem Replacement-Logging.
 
 Dateien: `backend/app/rag.py` (Zeilen 1354–1378)
 
@@ -325,7 +325,7 @@ Dateien: `backend/app/documents.py`, `backend/app/main.py`, `backend/pyproject.t
 
 ## Phase 3.5 — Musterbau-Testkorpus + Build-Skript (2026-05-08)
 
-Aufbau eines reproduzierbaren Test-Korpus für die Phase-3.1-Verifikationsmatrix unter `docs/tests/phase3/corpus/`. Source-of-Truth ist `MUSTERBAU.md` (374 Zeilen) mit gefrorenen Werten für eine fiktive Musterbau GmbH (Dortmund, NRW, 127 FTE, 18,45 M € Umsatz 2025, 30 Mitarbeitende, 50 Kunden, 5 PIMS-Produktlinien, 8 Schlüsselereignisse 2025, 10 BM25-Begriffe mit exklusiver Datei-Zuweisung).
+Aufbau eines reproduzierbaren Test-Korpus für manuelles RAG-Testing unter `docs/tests/phase3/corpus/`. Ursprünglich für eine formalisierte Phase-3.1-Verifikationsmatrix angelegt; Matrix selbst ist 2026-05-13 geparkt (siehe `PHASE3-MATRIX-SHELVED.md`), der Korpus bleibt aktiv für Ad-hoc-Prüfungen. Source-of-Truth ist `MUSTERBAU.md` (374 Zeilen) mit gefrorenen Werten für eine fiktive Musterbau GmbH (Dortmund, NRW, 127 FTE, 18,45 M € Umsatz 2025, 30 Mitarbeitende, 50 Kunden, 5 PIMS-Produktlinien, 8 Schlüsselereignisse 2025, 10 BM25-Begriffe mit exklusiver Datei-Zuweisung).
 
 Fixture-Verzeichnis `corpus/musterbau/` mit den aktiven Dateitypen: `geschaeftsbericht_2025.pdf` (12 KB, 7 Seiten, Logo auf jeder Seite identisch für pHash-Test), `finanzen_2025.xlsx` (8 KB, 3 Sheets Bilanz/GuV/Kapitalflussrechnung — Aktiva = Passiva = 9 050 000 €), `memo_strategieklausur.docx` (38 KB), `kunden.csv` (51 Zeilen), `techspec_pims.md` (230 Zeilen), `protokoll_qmeeting.txt` (172 Zeilen), plus `finanzen_legacy.xls` (5,6 KB, 2026-05-11 nachgereicht).
 
