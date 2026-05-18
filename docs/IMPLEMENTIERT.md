@@ -1025,3 +1025,84 @@ Vier parallele Opus-Agenten 2026-05-18, unabhängige Reports:
 - **Verifier D** (Blast-Radius): bestätigte keine `app_model_config`-Row hat `provider='xai'` → kein Data-Migration für #230; identifizierte `main.py:_run_rechunk_task` als CancelledError-Sibling-Finding → empfahl Bundling der 3 Fixes
 
 Konsens: 4-of-4 still-real für alle drei Findings.
+
+---
+
+## UX-Fix #281 — Misleading-Cancel-Button-Honesty in Bilder.jsx (2026-05-18)
+
+**Anlass:** Direkt nach dem #179-Deploy testete der User den Cancel-Button durch tatsächliches Klicken während einer gpt-image-1-Generation. Empirisches Ergebnis: das Bild erschien beim Reload trotzdem in der Galerie. Phase-A-Annahme („Starlette propagiert Client-Disconnect als `CancelledError` an den Handler-Task") war empirisch falsch — Starlette/FastAPI cancelt den Handler-Task NICHT automatisch bei Client-Disconnect. Der bestehende `except asyncio.CancelledError`-Branch in `image_gen.py:420-438` ist daher nur für Server-Shutdown / Worker-Recycle / explizite `task.cancel()`-Calls relevant, nicht für User-Cancel.
+
+### Befund
+
+`frontend/src/components/Bilder.jsx:124-126` `handleCancel` ruft `AbortController.abort()` — Frontend wartet nicht mehr auf die Response. Aber:
+- Browser schließt TCP-Verbindung → Uvicorn legt `http.disconnect`-Event in die ASGI-Receive-Queue
+- **Starlette propagiert das NICHT als Task-Cancellation.** Der Handler muss aktiv `await request.is_disconnected()` pollen — was unser Code nicht tut
+- Backend führt den OpenAI/xAI-POST fertig aus → `mark_image_succeeded` → Row landed in `status='succeeded'`
+
+Konsequenz: der Button ist kosmetisch. User-Intent (Generation abbrechen) wird ignoriert.
+
+### Warum kein Backend-Fix?
+
+Backend-seitige Cancellation wäre ökonomisch ungünstig:
+
+| Aspekt | Effekt |
+|---|---|
+| OpenAI/xAI-Kosten | Werden trotzdem berechnet (Request ist bereits raus) |
+| Bild auf Provider-Seite generiert | Ja |
+| Bei Cancellation: in unserer DB gespeichert | Nein (Row markiert `failed`, `cost_usd=0`) |
+| User-Daily-Cap-Counter | Inkrementiert NICHT |
+| Konsequenz | **Buchhaltungs-mismatch: wir zahlen Provider, zählen aber nichts in unserer Cap-Statistik** |
+
+Daher: Backend-Behavior heute ist **korrekt**. Was schlecht ist, ist die UX — der Button verspricht etwas das er nicht halten kann.
+
+### Fix (UX-only)
+
+**`frontend/src/i18n/strings.js`** — zwei neue Strings:
+```diff
+-    'bilder.button.cancel': 'Abbrechen',
++    'bilder.button.cancel': 'Verstecken',
+     'bilder.status.generating': 'Wird generiert...',
++    'bilder.status.backgrounded': 'Bild wird im Hintergrund fertig generiert. Du findest es gleich in der Galerie.',
+```
+
+**`frontend/src/components/Bilder.jsx`** — drei Änderungen:
+1. Neues `formInfo`-State + `backgroundRefreshRef`-Ref für Timer-Cleanup
+2. `handleCancel` ergänzt: setzt `formInfo` mit Toast-Text, plant nach 90 s ein automatisches `loadGallery(true)` + `loadBudget()` + Toast-Clear (90 s deckt gpt-image-1 p95 + xAI-Modelle)
+3. JSX rendert `formInfo` als blauen Info-Banner neben `formError`-Rendering-Slot
+4. Cleanup-Effect canceled offenen Timer beim Unmount
+
+Frontend ehrt jetzt was tatsächlich passiert: „dein Bild wird im Hintergrund fertig — wir holen es gleich für dich". Kein Lying, kein falsches Cancellation-Versprechen.
+
+### Auswirkung
+
+| User-Aktion | Vor Fix | Nach Fix |
+|---|---|---|
+| Klick auf „Abbrechen" während Generation | UI unblockt; Bild taucht still bei Reload in der Galerie auf — User verwirrt | UI unblockt; Toast erklärt dass Generation weiterläuft; Galerie aktualisiert sich automatisch nach 90 s |
+| Tab-Wechsel während Generation | Generation läuft im Backend weiter (unverändert) | Generation läuft im Backend weiter; bei Rückkehr zum Bilder-Tab + manuellem Refresh → Bild da |
+
+### Phase-A-Lesson (memory aktualisiert)
+
+Diese Iteration deckte ein Phase-A-Protokoll-Loch auf: 4 Opus-Verifier waren über #179 einig, weil sie alle die gleiche unverifizierte Annahme über Starlette-Runtime-Verhalten teilten. Multi-Agent-Consensus ist kein Beweis wenn alle Agenten den gleichen Blind-Spot haben. Neue Memory-Entry `feedback_phase_a_trace_triggers` dokumentiert die Lessons: Runtime-Trigger-Pfade müssen mit Doc/Source-Zitat verifiziert werden, nicht nur statische Code-Pattern; bei UI-Interaktionen empirisches Testing durch den User vor Code-Fix bevorzugen.
+
+### Bewusste Out-of-Scope
+
+- **#179-Backend-Fix bleibt drin.** Die `except asyncio.CancelledError`-Logik handelt Server-Shutdown / Worker-Recycle / programmatisches Cancellation sauber — selten aber real, kein Wegwerfen des Commits.
+- **Echte Cancellation (Backend hört auf zu warten + Disconnect-Polling)** — bewusst NICHT eingebaut, weil ökonomisch nicht sinnvoll (siehe „Warum kein Backend-Fix?" oben).
+- **Eigener Toast-Komponenten-Slot statt inline-Banner** — Frontend hat noch keine zentrale Toast-Komponente; inline-Banner ist pragmatisch. Future-Cleanup-Kandidat.
+- **`bilder-form-info`-CSS-Klasse** — heute inline-style, nicht in `styles.css`. Wenn weitere Info-Banner kommen, sollte eine echte Klasse her.
+
+### Berührte Dateien
+
+**Code:**
+- `frontend/src/i18n/strings.js` — 2 String-Änderungen (1 Update, 1 neu)
+- `frontend/src/components/Bilder.jsx` — `formInfo`-State + `backgroundRefreshRef`-Ref + `handleCancel`-Logik + JSX-Banner + Cleanup-Effect
+
+**Docs:**
+- `docs/IMPLEMENTIERT.md` — dieser Eintrag
+- `docs/BUG-AUDIT-2026-05-13.md` — #281 zu „Spätere Findings" mit FIXED 2026-05-18
+- `docs/BUG-FIX-PLAYBOOK.md` — §5 Eintrag für #281
+
+**Memory:**
+- `~/.claude/projects/-home-dri-code/memory/feedback_phase_a_trace_triggers.md` — neue Feedback-Regel über Phase-A-Rigor
+- `~/.claude/projects/-home-dri-code/memory/project_xqt5_bug_fix_workflow.md` — Cross-Reference auf die neue Feedback-Memory ergänzt
+- `~/.claude/projects/-home-dri-code/memory/MEMORY.md` — Index-Eintrag

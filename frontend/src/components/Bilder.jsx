@@ -15,7 +15,9 @@ export default function Bilder({ onError }) {
   const [selectedModel, setSelectedModel] = useState('')
   const [generating, setGenerating] = useState(false)
   const [formError, setFormError] = useState('')
+  const [formInfo, setFormInfo] = useState('')
   const abortRef = useRef(null)
+  const backgroundRefreshRef = useRef(null)
 
   // Gallery state
   const [images, setImages] = useState([])
@@ -40,6 +42,9 @@ export default function Bilder({ onError }) {
     return () => {
       if (abortRef.current) {
         abortRef.current.abort()
+      }
+      if (backgroundRefreshRef.current) {
+        clearTimeout(backgroundRefreshRef.current)
       }
     }
   }, [])
@@ -95,6 +100,7 @@ export default function Bilder({ onError }) {
       return
     }
     setFormError('')
+    setFormInfo('')
     setGenerating(true)
 
     const controller = new AbortController()
@@ -122,7 +128,18 @@ export default function Bilder({ onError }) {
   }
 
   function handleCancel() {
+    // The backend continues generating even after we abort the fetch — the OpenAI/xAI
+    // POST is in flight and the provider will bill us regardless. So this button
+    // only releases the UI; the image will still appear in the gallery when ready.
     if (abortRef.current) abortRef.current.abort()
+    setFormInfo(t('bilder.status.backgrounded'))
+    if (backgroundRefreshRef.current) clearTimeout(backgroundRefreshRef.current)
+    backgroundRefreshRef.current = setTimeout(() => {
+      loadGallery(true)
+      loadBudget()
+      setFormInfo('')
+      backgroundRefreshRef.current = null
+    }, 90000)
   }
 
   async function handleDelete(image) {
@@ -183,6 +200,17 @@ export default function Bilder({ onError }) {
       {/* Generate form */}
       <form className="bilder-form" onSubmit={handleGenerate}>
         {formError && <div className="admin-error">{formError}</div>}
+        {formInfo && (
+          <div className="bilder-form-info" style={{
+            padding: '8px 12px',
+            background: 'rgba(33, 52, 82, 0.08)',
+            border: '1px solid rgba(33, 52, 82, 0.2)',
+            borderRadius: '4px',
+            color: '#213452',
+            fontSize: '0.9rem',
+            marginBottom: '12px',
+          }}>{formInfo}</div>
+        )}
 
         <div className="form-group">
           <label htmlFor="bilder-prompt">{t('bilder.form.prompt.label')}</label>
