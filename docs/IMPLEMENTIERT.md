@@ -934,3 +934,94 @@ Vier parallele Opus-Agenten 2026-05-18, unabhängige Reports:
 - **Verifier D** (Blast-Radius): identifizierte Coolify-Traefik-60s-Default als praktische Decke; identifizierte #179 als ordering-relevant aber nicht bundling-pflichtig → empfahl 60 s als sicherer Default
 
 Konsens: 4-of-4 still-real, beide Findings.
+
+---
+
+## Bugfix #179 + #3 + #230 — Image-Gen Härtung: Cancel-Handler + Limits-Defense + xAI-Naming (2026-05-18)
+
+**Anlass:** Drei verbleibende Image-Gen-Funde aus dem 2026-05-13-Audit nach DEV-Verifikation der vorherigen Fixes als Bundle: #179 (CancelledError leakt Pending-Rows), #3 (`check_daily_cost_cap`-Queries ohne try/except → 500 auf PROD pre-A2), #230 (xAI-Provider-Naming-Mismatch macht xAI-Image-Gen tot). Alle drei in derselben Datei (`backend/app/image_gen.py`), textuell disjunkt, DEV-safe.
+
+### Befund
+
+**#179** — `image_gen.py:392-419` hatte einen `try/except HTTPException + except Exception`-Block. Python 3.11 `asyncio.CancelledError` erbt von `BaseException`, NICHT von `Exception` → wird von keinem Branch gefangen. Konsequenz: Wenn der User die „Abbrechen"-Schaltfläche in `Bilder.jsx` drückt (`Bilder.jsx:100-126` hat einen funktionierenden AbortController + Cleanup-on-Unmount), wird die Verbindung abgebrochen → Starlette propagiert `CancelledError` → die Pending-Row aus `create_pending_image` an `image_gen.py:361` bleibt für immer auf `status='pending'`. Kein `mark_image_failed`, kein `IMAGE_GENERATE_FAILED`-Audit. Verifier-B bestätigte: User sieht nichts (Galerie filtert auf `status='succeeded'`), Admin sieht Orphan-Row und ein `image.generate`-Audit ohne Terminal-Event. Wachstum unbounded.
+
+**#3** — `image_gen.py:67-87` rief drei Supabase-Queries direkt auf ohne Exception-Handling: Aggregator auf `app_generated_images`, Lookup auf `app_user_limits`, Fallback auf `app_settings`. Auf PROD ohne A2-Migration (`app_user_limits` und `app_generated_images` existieren dann nicht) → `postgrest.APIError` → 500 für den User auf jeden Bildgenerierungs-Aufruf. Auf DEV mit angewendeter A2 latent: nur reachable bei transientem Supabase-REST-Disconnect / Kong-Hiccup. Der Audit-Scope hat den Aggregator-Query an L56-64 unterschätzt — der hatte denselben PROD-Failure-Mode (gleiche Tabelle aus derselben A2-Migration).
+
+**#230** — `image_gen.py:203` rief `get_api_key("xai")` (ohne Hyphen), `:254` dispatched auf `provider == "xai"`, und `:258` führte „Supported: openai, xai" als Fehlertext. Der Rest der Codebase nutzt durchweg `"x-ai"` (mit Hyphen): `providers.py:13` `KNOWN_PROVIDERS`, `config.py:19` `PROVIDER_KEYS`, `llm.py:40` `PROVIDER_CONFIG`, `llm.py:70` Seed-Modell `x-ai/grok-4`. Konsequenz: `get_api_key("xai")` returns `None` (Keys sind unter `"x-ai"` gespeichert) → 503; oder Dispatch fällt durch zu `else` → 400 mit dem self-contradicting Fehlertext „Unsupported image provider: x-ai. Supported: openai, xai". xAI-Image-Gen war seit Launch tot. Verifier-D bestätigte: keine `app_model_config`-Row mit `provider='xai'` existiert (keine Seed-Daten, keine Admin-Insertion), daher dormant heute — aber tot ab dem ersten xAI-Image-Model.
+
+### Fix
+
+**audit.py:31** — neue Konstante:
+```python
+IMAGE_GENERATE_CANCELLED = "image.generate.cancelled"
+```
+Eigener Audit-Action-Wert (statt Re-Use von `IMAGE_GENERATE_FAILED`), damit Failure-Rate-Metriken in `get_image_usage_report` zwischen echtem Provider-Fehler und User-Cancel unterscheiden können.
+
+**image_gen.py — drei Änderungen:**
+
+1. **#179** — `import asyncio` am Datei-Anfang. Neuer Handler-Branch im try/except an L392 (BEFORE `except HTTPException`):
+   ```python
+   except asyncio.CancelledError:
+       error_msg = "CancelledError: client disconnect or task cancellation"
+       logger.warning("Image generation cancelled image_id=%s provider=%s model=%s", image_id, provider, model)
+       mark_image_failed(image_id, error_msg)
+       audit.log_event(action=audit.IMAGE_GENERATE_CANCELLED, ..., metadata={"provider": provider, "model": model, "cancelled": True})
+       raise  # MUST re-raise — swallowing CancelledError bricht asyncio-Task-Semantik
+   ```
+   Bewusst kein `await` im Cleanup-Pfad: `mark_image_failed` und `audit.log_event` sind sync (sync supabase-py-Client), kein neuer Cancel-Window.
+
+2. **#3** — `check_daily_cost_cap` wrappt alle drei Queries einzeln in `try/except Exception` mit `logger.warning` mit Klassen-Name + Fallback-Default. Aggregator-Fallback: `used_today = 0.0`. Limits-Fallback: `daily_limit = None` (führt zur Settings-Lookup). Settings-Fallback: `daily_limit = 5.0` (hard fallback). Pattern matched die existierende `providers.py:39`-Konvention (broad Exception, Klassen-Name geloggt). Bugs im eigenen Code bleiben sichtbar via Klassen-Name + Message-Logging; PROD-pre-A2 + transient-Outages werden gnädig gehandhabt.
+
+3. **#230** — drei String-Literal-Swaps:
+   - `image_gen.py:203`: `get_api_key("xai")` → `get_api_key("x-ai")`
+   - `image_gen.py:254`: `if provider == "xai":` → `if provider == "x-ai":`
+   - `image_gen.py:258`: `"...Supported: openai, xai"` → `"...Supported: openai, x-ai"`
+   Keine Data-Migration nötig (keine bestehende `app_model_config`-Row mit `provider='xai'` per Verifier-D-grep bestätigt).
+
+### Auswirkung
+
+| Pfad | Vor Fix | Nach Fix |
+|---|---|---|
+| User cancel mid-gen (Bilder.jsx „Abbrechen") | Pending-Row leakt für immer, kein Audit-Terminal-Event | Row → `status=failed`, Audit `image.generate.cancelled`, asyncio-Cancel propagiert sauber |
+| Supabase-REST-Outage während Cost-Cap-Check | 500 für den User, Audit-Trail unklar | `logger.warning` mit Klassen-Name, Fallback-Defaults, Generation läuft weiter |
+| PROD ohne A2 (post-Catchup-Lag) | 500 auf jedem Image-Gen-Call | Generation funktioniert mit Default-Limits (5.0 USD) bis A2 nachgezogen ist |
+| xAI-Image-Model-Generation | 503 „xAI API key not configured" oder 400 self-contradicting | Funktioniert sobald ein xAI-Image-Model registriert ist |
+
+### Bewusste Out-of-Scope
+
+- **`resolve_style_prefix` (image_gen.py:117-133)** hat denselben unprotected-Query-Pattern auf `app_image_style_presets`. Separates Finding (nicht von Audit #3 umfasst), nicht gebündelt. Wenn aktiv — ist es nicht heute auf DEV/PROD.
+- **`_run_rechunk_task` in main.py** hat denselben CancelledError-Gap (laut Audit-Hinweis bei #179). Separates Finding, anderes File, separater Fix-Cycle.
+- **`app_image_style_presets`-Query in `resolve_style_prefix`** würde PROD-pre-A2 auch 500en, aber Audit-Scope unterscheidet. Future-Finding.
+- **Pydantic `Literal["openai", "x-ai"]` für `provider` in `CreateModelConfigRequest`** würde künftige Provider-Namen-Mismatches kategorisch verhindern. Verifier-B-Empfehlung, aber Scope-Creep für diesen Commit.
+- **Per-Modell-konfigurierbare Daily-Cost-Limits** — Future-Feature.
+
+### Berührte Dateien
+
+**Code:**
+- `backend/app/audit.py` — neue Konstante `IMAGE_GENERATE_CANCELLED`
+- `backend/app/image_gen.py` — `import asyncio`; `check_daily_cost_cap` umgebaut; CancelledError-Branch ergänzt; drei `"xai"` → `"x-ai"` Swaps
+
+**Docs:**
+- `docs/IMPLEMENTIERT.md` — dieser Eintrag
+- `docs/BUG-AUDIT-2026-05-13.md` — #3, #179, #230 auf `FIXED 2026-05-18`
+- `docs/BUG-FIX-PLAYBOOK.md` — #230 (G3), #179 (G5) Status geflippt; #3 als neuer G3-Row; §5-Eintrag
+- `docs/PROD-UPGRADE-PLAYBOOK.md` — Hinweis dass #3-Fix die A2-Pre-Reqs-Härte für Image-Gen lockert
+- `docs/SECURITY.md` — neue Audit-Action `image.generate.cancelled` dokumentiert
+- `docs/CODING-DOKUMENT.md` — Provider-Naming-Konvention (`"x-ai"` mit Hyphen, niemals `"xai"`)
+
+### PROD-Reachability-Hinweis
+
+- **#179**: PROD-relevant — ein User auf PROD, der mid-gen cancelt, leakt heute Rows. Fix wirkt sofort nach Deploy.
+- **#3**: lockert die A2-Pre-Req für PROD — Image-Gen-Routen 500en nicht mehr hard wenn A2 noch nicht angewendet ist. ABER: A2 muss trotzdem auf PROD nachgezogen werden, sonst funktionieren Cost-Tracking + Limits-Enforcement nicht. Defense, keine Migration-Ersetzung.
+- **#230**: wird relevant sobald ein xAI-Image-Model registriert wird; aktuell dormant (keine xAI-Image-Modelle in `app_model_config`).
+
+### Phase-A-Verifikationsteam
+
+Vier parallele Opus-Agenten 2026-05-18, unabhängige Reports:
+
+- **Verifier A** (informiert, Mechanism-Focus): bestätigte httpcore→httpx Empty-Message-Kette aus #279 ist auch der Mechanismus warum CancelledError-Cleanup fehlt; `postgrest.APIError` als kanonische Klasse für #3-Catch identifiziert → VERDICT 3× still-real
+- **Verifier B** (informiert, User-Impact-Focus): traced den `Bilder.jsx`-AbortController-Pfad end-to-end, bestätigte #179 ist LIVE heute; identifizierte zusätzliche unprotected-Queries für Future-Findings → VERDICT 3× still-real
+- **Verifier C** (impartial, Cold-Eyes ohne Audit-Framing): identifizierte UTC-Day-Boundary-Bug (Audit #23) und `resolve_style_prefix`-Gap als zusätzliche Smells → VERDICT 3× still-real
+- **Verifier D** (Blast-Radius): bestätigte keine `app_model_config`-Row hat `provider='xai'` → kein Data-Migration für #230; identifizierte `main.py:_run_rechunk_task` als CancelledError-Sibling-Finding → empfahl Bundling der 3 Fixes
+
+Konsens: 4-of-4 still-real für alle drei Findings.

@@ -368,6 +368,12 @@ Ohne diese Schritte ist die Bildgenerierung nicht nutzbar:
 
 Vor dem Commit das Tag `git tag pre-image-gen` setzen (nur lesen, kein Push — User-Aufgabe). Bei schwerwiegendem Fehler nach dem Deploy: `git reset --hard pre-image-gen` und neu pushen. Die neuen Tabellen (`app_generated_images`, `app_image_style_presets`, `app_user_limits`) und die neuen Spalten an bestehenden Tabellen bleiben in der DB — sie enthalten dann schlimmstenfalls leere Daten. Da alle Änderungen additiv sind, funktioniert der alte Code weiterhin korrekt neben den neuen leeren Tabellen.
 
+### #3-Defense (relevant ab 2026-05-18 mit Fix #3)
+
+`backend/app/image_gen.py:check_daily_cost_cap` ist jetzt defensiv gegen fehlende Tabellen (PROD pre-A2-Migration) und transiente Supabase-REST-Outages. Konkret: jeder der 3 Queries (`app_generated_images`-Aggregator, `app_user_limits`-Lookup, `app_settings`-Fallback) ist einzeln in `try/except` gewrappt, mit Logger-Warnung + Fallback-Default.
+
+**Bedeutung für den PROD-Catchup-Track:** Image-Gen-Routen 500en nicht mehr hart wenn A2 noch nicht angewendet ist — der Code degradiert auf den Hard-Fallback `daily_limit = 5.0 USD` und protokolliert die fehlenden Tabellen via `logger.warning`. **ABER:** das ist Defense, keine Migration-Ersetzung. Ohne A2 funktionieren Cost-Tracking, Per-User-Limits und Audit-Visibility nicht korrekt — A2 muss trotzdem nachgezogen werden, nur ohne den vorherigen Hard-500-Druck.
+
 ### Traefik-Upstream-Timeout (relevant ab 2026-05-18 mit Fix #278)
 
 `backend/app/image_gen.py` ruft die OpenAI- und xAI-Bildgenerierungs-Endpoints mit `httpx.AsyncClient(timeout=60.0)`. Coolifys Traefik hat per Default einen 60-s-Upstream-Timeout pro Service. Wenn in PROD gpt-image-1-Generierungen länger als 60 s benötigen (etwa bei HD-Qualität mit komplexen Prompts), entsteht ein 502 von Traefik **bevor** der Backend-Handler antworten kann.

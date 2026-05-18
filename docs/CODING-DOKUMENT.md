@@ -11,6 +11,7 @@ Dieses Dokument hält Coding-Entscheidungen und Fehlerjournal fest, damit Fehler
 5. CORS und Security-Header werden für produktive Domains explizit gesetzt.
 6. Keine Funktions- oder Codeübernahme aus `llm-council`; ausschließlich API-basierte Anbindung.
 7. In Code und Dokumentation wird nicht auf externe Wettbewerbs-Produktnamen verwiesen.
+8. **Provider-Namen-Konvention:** Provider-Identifier folgen der Liste in `backend/app/providers.py:KNOWN_PROVIDERS`. xAI = `"x-ai"` (mit Hyphen), niemals `"xai"`. Diese Namen werden 1:1 in `app_model_config.provider`, `app_provider_keys.provider`, `PROVIDER_KEYS` (config.py), und `PROVIDER_CONFIG` (llm.py) verwendet. Neue Code-Pfade müssen den kanonischen Namen aus `KNOWN_PROVIDERS` lesen oder darauf vergleichen — keine eigenen String-Literale erfinden. Hintergrund: Bug #230 (2026-05-18) zeigte einen kompletten Image-Gen-Pfad tot wegen `"xai"`-vs-`"x-ai"`-Mismatch.
 
 ## Fehlerjournal
 

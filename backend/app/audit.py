@@ -27,6 +27,7 @@ DOCUMENT_UPLOAD_DEDUP_SKIPPED = "document.upload.dedup_skipped"
 
 IMAGE_GENERATE = "image.generate"
 IMAGE_GENERATE_FAILED = "image.generate.failed"
+IMAGE_GENERATE_CANCELLED = "image.generate.cancelled"
 IMAGE_GENERATE_MODERATION_BLOCKED = "image.generate.moderation_blocked"
 IMAGE_DELETE = "image.delete"
 ADMIN_IMAGE_STYLE_PRESET_CREATE = "admin.image_style_preset.create"

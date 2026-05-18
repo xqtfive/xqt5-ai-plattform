@@ -1,5 +1,6 @@
 """Image generation: provider dispatch, daily cap, style prefix, gallery."""
 
+import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
@@ -49,44 +50,68 @@ def check_daily_cost_cap(user_id: str) -> Dict[str, Any]:
 
     Only succeeded images count against the daily total — pending/failed do not.
     Returns: {daily_limit_usd, used_today_usd, remaining_usd, allowed: bool}
+
+    Defensive against missing tables / transient Supabase outages: each query is
+    wrapped so a failure falls back to a safe default rather than 500-ing the
+    image-generation route. Required for PROD where A2 migration may not yet be
+    applied (see PROD-UPGRADE-PLAYBOOK).
     """
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     # Sum succeeded images generated today
-    agg_result = (
-        supabase.table("app_generated_images")
-        .select("cost_usd")
-        .eq("user_id", user_id)
-        .eq("status", "succeeded")
-        .gte("created_at", f"{today_str}T00:00:00+00:00")
-        .lt("created_at", f"{today_str}T23:59:59.999999+00:00")
-        .execute()
-    )
-    used_today = sum(float(r["cost_usd"]) for r in (agg_result.data or []))
+    used_today = 0.0
+    try:
+        agg_result = (
+            supabase.table("app_generated_images")
+            .select("cost_usd")
+            .eq("user_id", user_id)
+            .eq("status", "succeeded")
+            .gte("created_at", f"{today_str}T00:00:00+00:00")
+            .lt("created_at", f"{today_str}T23:59:59.999999+00:00")
+            .execute()
+        )
+        used_today = sum(float(r["cost_usd"]) for r in (agg_result.data or []))
+    except Exception as e:
+        logger.warning(
+            "check_daily_cost_cap: app_generated_images aggregation failed user=%s: %s: %s — assuming 0.0 spent today",
+            user_id, type(e).__name__, e,
+        )
 
     # Per-user limit
-    limit_row = (
-        supabase.table("app_user_limits")
-        .select("daily_image_cost_limit_usd")
-        .eq("user_id", user_id)
-        .execute()
-    )
     daily_limit: Optional[float] = None
-    if limit_row.data and limit_row.data[0].get("daily_image_cost_limit_usd") is not None:
-        daily_limit = float(limit_row.data[0]["daily_image_cost_limit_usd"])
+    try:
+        limit_row = (
+            supabase.table("app_user_limits")
+            .select("daily_image_cost_limit_usd")
+            .eq("user_id", user_id)
+            .execute()
+        )
+        if limit_row.data and limit_row.data[0].get("daily_image_cost_limit_usd") is not None:
+            daily_limit = float(limit_row.data[0]["daily_image_cost_limit_usd"])
+    except Exception as e:
+        logger.warning(
+            "check_daily_cost_cap: app_user_limits lookup failed user=%s: %s: %s — falling back to system default",
+            user_id, type(e).__name__, e,
+        )
 
     # Fall back to system default
     if daily_limit is None:
-        setting_row = (
-            supabase.table("app_settings")
-            .select("value")
-            .eq("key", "default_daily_image_cost_limit_usd")
-            .execute()
-        )
-        if setting_row.data:
-            daily_limit = float(setting_row.data[0]["value"])
-        else:
-            daily_limit = 5.0  # Hard fallback if settings row is missing
+        try:
+            setting_row = (
+                supabase.table("app_settings")
+                .select("value")
+                .eq("key", "default_daily_image_cost_limit_usd")
+                .execute()
+            )
+            if setting_row.data:
+                daily_limit = float(setting_row.data[0]["value"])
+        except Exception as e:
+            logger.warning(
+                "check_daily_cost_cap: app_settings lookup failed: %s: %s — using hard fallback 5.0 USD",
+                type(e).__name__, e,
+            )
+        if daily_limit is None:
+            daily_limit = 5.0  # Hard fallback if settings row is missing OR table inaccessible
 
     remaining = max(0.0, daily_limit - used_today)
     return {
@@ -200,7 +225,7 @@ async def _call_xai(
     - ``url`` field  → storage_kind='provider_url'
     - ``b64_json`` field → storage_kind='data_uri'
     """
-    api_key = get_api_key("xai")
+    api_key = get_api_key("x-ai")
     if not api_key:
         raise HTTPException(status_code=503, detail="xAI API key not configured")
 
@@ -251,11 +276,11 @@ async def _call_provider(
     """Dispatch to the correct provider function."""
     if provider == "openai":
         return await _call_openai(model_name, prompt, parameters)
-    if provider == "xai":
+    if provider == "x-ai":
         return await _call_xai(model_name, prompt, parameters)
     raise HTTPException(
         status_code=400,
-        detail=f"Unsupported image provider: {provider}. Supported: openai, xai",
+        detail=f"Unsupported image provider: {provider}. Supported: openai, x-ai",
     )
 
 
@@ -392,6 +417,25 @@ async def generate_image_for_user(
     # 8. Call provider
     try:
         result = await _call_provider(provider, model, resolved_prompt, parameters)
+    except asyncio.CancelledError:
+        # Client disconnected (AbortController fired) or server is shutting down.
+        # Mark the pending row failed so it doesn't leak forever, audit with the
+        # dedicated CANCELLED action so failure-rate metrics stay clean, then
+        # re-raise — swallowing CancelledError breaks asyncio task semantics.
+        error_msg = "CancelledError: client disconnect or task cancellation"
+        logger.warning(
+            "Image generation cancelled image_id=%s provider=%s model=%s",
+            image_id, provider, model,
+        )
+        mark_image_failed(image_id, error_msg)
+        audit.log_event(
+            action=audit.IMAGE_GENERATE_CANCELLED,
+            user_id=user_id,
+            target_type="generated_image",
+            target_id=image_id,
+            metadata={"provider": provider, "model": model, "cancelled": True},
+        )
+        raise
     except HTTPException as exc:
         error_msg = f"HTTP {exc.status_code}: {exc.detail}"
         mark_image_failed(image_id, error_msg)

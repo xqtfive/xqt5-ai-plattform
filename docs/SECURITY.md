@@ -208,6 +208,13 @@ Konsequenz für `provider_url`: Generierte Bilder sind für die Lebensdauer der 
 
 **Prompts werden nicht im Audit-Log gespeichert.** Der vollständige Prompt-Text (inklusive Stil-Präfix) wird nicht in `app_audit_logs` eingetragen — nur Prompt-Länge, Nutzer-ID und Modell-ID. Das schützt vor versehentlichem Logging sensibler Prompt-Inhalte. Falls spätere Compliance-Anforderungen Prompt-Archivierung erfordern, muss dies explizit ergänzt werden.
 
+**Audit-Actions für Bildgenerierung (Stand 2026-05-18):**
+- `image.generate` — Generation gestartet (Pending-Row angelegt).
+- `image.generate.failed` — Generation fehlgeschlagen (Provider-Fehler, Python-Exception).
+- `image.generate.cancelled` — Generation vom Client abgebrochen (AbortController / Tab-Close / Server-Shutdown). Eigene Action statt Re-Use von `failed` damit Failure-Rate-Metriken Cancel von Provider-Fehlern unterscheiden können.
+- `image.generate.moderation_blocked` — Generation vom Provider-Moderationssystem abgelehnt.
+- `image.delete` — Image vom User aus der Galerie gelöscht.
+
 **Stil-Präfix — akzeptiertes Risiko.** Der globale Stil-Präfix aus `app_image_style_presets` wird serverseitig vor den Nutzer-Prompt gesetzt. Ein kompromittierter Admin-Account könnte über den Präfix gezielt den Nutzer-Prompt manipulieren (Prompt-Injection vom Admin-Layer). Das ist ein akzeptiertes Risiko im Trust-Modell: Admins sind vertrauenswürdig; der Präfix ist für Admins im Dashboard sichtbar, aber nicht für Nutzer. Wenn das Trust-Modell sich ändert (z. B. delegierte Admins mit eingeschränkten Rechten), muss der Präfix-Mechanismus neu bewertet werden.
 
 **Provider-seitige Moderation** ist in v1 der einzige Content-Gate. OpenAI und xAI lehnen gegen ihre Policy verstoßende Prompts auf ihrer Seite ab. Eine eigene Guardrail-Schicht (Llama Guard, Azure Prompt Shields) ist geplant (TODO Abschnitt „Input-/Output-Guardrails"), aber in v1 nicht vorhanden.

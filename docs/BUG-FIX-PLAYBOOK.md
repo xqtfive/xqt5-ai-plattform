@@ -124,7 +124,9 @@ Diese wurden bereits adressiert. Re-Verifikation in Phase A würde "ALREADY-FIXE
 - FEATURE-DOKUMENT.md:411–432 obsoleter Block gelöscht
 - IMPLEMENTIERT.md A2-Status präzisiert auf „dev-vollständig"
 - Phase 3.1 Matrix-Track geparkt in `PHASE3-MATRIX-SHELVED.md`
-- **#1 + #24 (2026-05-18)** — `main.py:77` Modul-Scope-Import `from .database import supabase` ergänzt (POST `/api/images/generate` chat-anchored + DELETE `/api/images/{id}` wiederhergestellt); `main.py:2382` (post-fix; audit-Zeitstand L2381) DELETE-Statement um `.eq("user_id", current_user["id"])` erweitert (TOCTOU-Window geschlossen). Phase-A-Re-Verifikation mit 4 parallelen Opus-Agenten 2026-05-18 — Audit-Scope für #1 war unterschätzt (POST-Pfad ebenfalls betroffen). Details: `IMPLEMENTIERT.md` „Bugfix #1 + #24 (2026-05-18)".
+- **#1 + #24 (2026-05-18)** — `main.py:77` Modul-Scope-Import `from .database import supabase` ergänzt (POST `/api/images/generate` chat-anchored + DELETE `/api/images/{id}` wiederhergestellt); `main.py:2382` (post-fix; audit-Zeitstand L2381) DELETE-Statement um `.eq("user_id", current_user["id"])` erweitert (TOCTOU-Window geschlossen). Phase-A-Re-Verifikation mit 4 parallelen Opus-Agenten 2026-05-18 — Audit-Scope für #1 war unterschätzt (POST-Pfad ebenfalls betroffen). Details: `IMPLEMENTIERT.md` „Bugfix #1 + #24 (2026-05-18)". **DEV-verifiziert 2026-05-18:** Löschen funktioniert ohne Fehler, Coolify-Logs sauber.
+- **#278 + #279 (2026-05-18)** — `image_gen.py:157, 210` httpx-Timeout 30 → 60 s für OpenAI- und xAI-Bildgenerierung (Coolify-Traefik-Decke 60 s erreicht); `image_gen.py:409-419` Catch-all-Branch um `type(exc).__name__`-Präfix, `str(exc) or repr(exc)`-Fallback und `logger.error(exc_info=True)` erweitert — Python-Level-Failures sind jetzt diagnostizierbar. Phase-A 4-of-4-Agenten 2026-05-18. Details: `IMPLEMENTIERT.md` „Bugfix #278 + #279 (2026-05-18)". **DEV-verifiziert 2026-05-18:** gpt-image-1-Generierung funktioniert (dauert merklich länger), Coolify-Logs sauber.
+- **#179 + #3 + #230 (2026-05-18)** — `image_gen.py` Triple-Fix: (a) `import asyncio` + neuer `except asyncio.CancelledError`-Branch im `_call_provider`-try/except, markiert Row failed, audit `IMAGE_GENERATE_CANCELLED`, re-raise — schließt Pending-Row-Leak bei Client-Cancel; (b) `check_daily_cost_cap` umfasst jetzt 3 per-Query-try/except mit Fallback-Default — schützt `POST /api/images/generate` gegen PROD-pre-A2-Failure und transiente Supabase-REST-Blips; (c) `"xai"` → `"x-ai"` an L203, L254, L258 — xAI-Image-Gen-Pfad ist nicht mehr tot. Neue Audit-Konstante `IMAGE_GENERATE_CANCELLED = "image.generate.cancelled"` in `audit.py:31`. Phase-A mit 4 parallelen Opus-Agenten 2026-05-18. Details: `IMPLEMENTIERT.md` „Bugfix #179 + #3 + #230 (2026-05-18)".
 
 ---
 
@@ -180,7 +182,8 @@ Diese wurden bereits adressiert. Re-Verifikation in Phase A würde "ALREADY-FIXE
 | #87 | `_call_anthropic` KeyError bei missing `text`-Field | `llm.py:282` | VERIFIED-MULTI | llm.py — `.get("text", "")` |
 | #111 | Google SAFETY-Block silent empty Content | `llm.py:307, 554–560` | VERIFIED-MULTI | llm.py — finishReason/blockReason-Check + Error-Raise |
 | #125 | Anthropic non-text-Block (thinking, tool_use) → empty content persisted | `llm.py:_call_anthropic`/`_stream_anthropic` | VERIFIED-MULTI | llm.py — Block-Type-Handling |
-| #230 | xAI-Provider-Name-Mismatch (`xai` vs `x-ai`) | `image_gen.py:203, 254` | VERIFIED-MULTI | image_gen.py — Renaming auf `x-ai` |
+| #230 | xAI-Provider-Name-Mismatch (`xai` vs `x-ai`) | `image_gen.py:203, 254, 258` | FIXED 2026-05-18 | 3 String-Literale auf `x-ai` umgestellt; keine Data-Migration nötig |
+| #3 | `check_daily_cost_cap` Supabase-Queries ohne try/except → 500 auf PROD pre-A2-Migration | `image_gen.py:55–94` | FIXED 2026-05-18 | Alle 3 Queries (Aggregator + Limits + Settings) per-Query try/except mit Fallback-Default und Klassen-Name-Logging |
 | #247 | Kein Retry/Backoff anywhere in `llm.py` | `llm.py` gesamt | VERIFIED-MULTI | llm.py — Tenacity oder eigenes Backoff-Pattern |
 | #274 | Cohere half-wired (`KNOWN_PROVIDERS` aber kein `PROVIDER_CONFIG`-Eintrag) | `providers.py:13` + `llm.py:18–58` | VERIFIED-MULTI | Entweder Cohere implementieren oder aus KNOWN_PROVIDERS entfernen |
 | #278 | `httpx.AsyncClient(timeout=30.0)` zu eng für gpt-image-1 (regelmäßig 40-90+ s) — empirisch 100% Failure-Rate; Coolify-Traefik-Upstream-Default 60 s als praktische Decke | `image_gen.py:157, 210` | FIXED 2026-05-18 (verifizierter Fund nach 2026-05-13) |
@@ -206,7 +209,7 @@ Diese wurden bereits adressiert. Re-Verifikation in Phase A würde "ALREADY-FIXE
 | # | Bug | File:Line | Status | Blast |
 |---|---|---|---|---|
 | #10 / #131 / #234 | Stream Partial-Write-Orphan (Persistierung im try-Block) | `main.py:836–884, 2233–2270` | VERIFIED-MULTI | main.py 2 Streamer + storage.py Status-Spalte |
-| #179 | `asyncio.CancelledError` leaks pending Image-Rows | `image_gen.py:392–419` | VERIFIED-MULTI | image_gen.py + möglicherweise rechunk-equivalent |
+| #179 | `asyncio.CancelledError` leaks pending Image-Rows | `image_gen.py:392–419` | FIXED 2026-05-18 | `except asyncio.CancelledError`-Branch mit `IMAGE_GENERATE_CANCELLED`-Audit-Konstante; `_run_rechunk_task`-Variante bleibt als separates Finding |
 | #200 | Streaming-SSE keine AbortController | `api.js:998–1042, 712–756` | VERIFIED-MULTI | api.js — AbortController-Pattern |
 | #150 | `asyncio.create_task` Referenz nicht retained | `main.py:811, 878, 2197, 2264` | VERIFIED-MULTI | main.py — `_BG_TASKS`-Set + add_done_callback |
 | #279 | `except Exception`-Catch-all schreibt `str(exc)[:500]` (leer für httpx-Timeout-Klassen) und ruft kein `logger.error` — Python-Level-Failures unsichtbar | `image_gen.py:409–419` | FIXED 2026-05-18 (verifizierter Fund nach 2026-05-13) |
