@@ -14,6 +14,46 @@ class LLMError(Exception):
     pass
 
 
+def _safe_provider_error(
+    provider: str,
+    status: int,
+    raw_body: str,
+) -> str:
+    """Return a user-safe error message from a non-2xx provider response.
+
+    Extracts only the structured `error.message` field (works for OpenAI,
+    Anthropic, Google, Mistral, Azure error envelopes); falls back to a
+    generic `HTTP {status}` shape if parsing fails. Full raw body is logged
+    server-side at WARNING level so ops still has forensic detail. The result
+    of this function is what eventually reaches the user via SSE error frame
+    or HTTPException detail — it MUST NOT include API keys, URLs, headers,
+    or echoed prompts.
+
+    Audit #57/#255 (2026-05-18): the previous direct `resp.text[:500]`
+    interpolation could echo Google URLs (with `?key=…`), prompt fragments,
+    or internal request IDs to the browser.
+    """
+    # Server-side log for forensic triage (Coolify stdout only — never audit DB).
+    logger.warning(
+        "Provider error provider=%s status=%s body=%r",
+        provider, status, (raw_body or "")[:2000],
+    )
+    if raw_body:
+        try:
+            data = json.loads(raw_body)
+        except (json.JSONDecodeError, ValueError):
+            data = None
+        if isinstance(data, dict):
+            err = data.get("error")
+            if isinstance(err, dict):
+                msg = err.get("message")
+                if isinstance(msg, str) and msg.strip():
+                    # Trim, strip newlines (SSE-safety), cap length
+                    safe_msg = msg.replace("\n", " ").replace("\r", " ").strip()[:200]
+                    return f"{provider} API error ({status}): {safe_msg}"
+    return f"{provider} API error ({status})"
+
+
 # Provider endpoint and header configuration
 PROVIDER_CONFIG = {
     "openai": {
@@ -248,7 +288,7 @@ async def _call_openai_compatible(
 
     resp = await client.post(url, headers=headers, json=payload)
     if resp.status_code != 200:
-        raise LLMError(f"{provider} API error ({resp.status_code}): {resp.text[:500]}")
+        raise LLMError(_safe_provider_error(provider, resp.status_code, resp.text))
 
     data = resp.json()
     return {
@@ -275,15 +315,51 @@ async def _call_anthropic(
 
     resp = await client.post(url, headers=headers, json=payload)
     if resp.status_code != 200:
-        raise LLMError(f"Anthropic API error ({resp.status_code}): {resp.text[:500]}")
+        raise LLMError(_safe_provider_error("anthropic", resp.status_code, resp.text))
 
     data = resp.json()
     content_blocks = data.get("content", [])
     text = "".join(block["text"] for block in content_blocks if block.get("type") == "text")
+    if not text:
+        # Audit #125: non-text blocks (thinking, tool_use, server_tool_use, etc.)
+        # would otherwise produce silent-empty responses. Surface the actual
+        # block-type vocabulary + stop_reason so callers can diagnose.
+        block_types = sorted({b.get("type", "?") for b in content_blocks})
+        stop_reason = data.get("stop_reason", "?")
+        raise LLMError(
+            f"Anthropic returned no text content (stop_reason={stop_reason}, block_types={block_types})"
+        )
     return {
         "content": text,
         "usage": data.get("usage", {}),
     }
+
+
+# Google `finishReason` values that indicate the response was blocked or
+# filtered out — must surface as an explicit error, not silent-empty (audit #111).
+# STOP / MAX_TOKENS / LANGUAGE / OTHER pass through (partial content is valid).
+_GOOGLE_BLOCKED_FINISH_REASONS = frozenset({
+    "SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII",
+})
+
+
+def _check_google_block(data: Dict[str, Any]) -> None:
+    """Raise LLMError if Google response indicates a content/prompt block.
+
+    Audit #111: previously SAFETY/RECITATION/etc. returned empty `parts` and
+    the parser silently yielded "" to the user — chat showed a blank reply
+    with no diagnostic. Now: prompt-pre-block AND post-generation block both
+    raise explicit LLMError.
+    """
+    prompt_feedback = data.get("promptFeedback") or {}
+    block_reason = prompt_feedback.get("blockReason")
+    if block_reason:
+        raise LLMError(f"Google blocked the prompt (reason: {block_reason})")
+    candidates = data.get("candidates") or []
+    if candidates:
+        finish_reason = candidates[0].get("finishReason")
+        if finish_reason in _GOOGLE_BLOCKED_FINISH_REASONS:
+            raise LLMError(f"Google blocked the response (finishReason: {finish_reason})")
 
 
 async def _call_google(
@@ -293,14 +369,20 @@ async def _call_google(
     temperature: float,
     api_key: str,
 ) -> Dict[str, Any]:
-    url = f"{PROVIDER_CONFIG['google']['base_url']}/models/{model_name}:generateContent?key={api_key}"
+    # Audit #82/#235: API key now passed via `x-goog-api-key` header instead
+    # of the `?key=` URL query so it doesn't leak into Coolify access logs,
+    # httpx RequestError reprs, or echoed-URL error bodies. Header form is the
+    # canonical curl example in current Google AI docs.
+    url = f"{PROVIDER_CONFIG['google']['base_url']}/models/{model_name}:generateContent"
+    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
     payload = _build_google_request(messages, temperature, stream=False)
 
-    resp = await client.post(url, json=payload)
+    resp = await client.post(url, headers=headers, json=payload)
     if resp.status_code != 200:
-        raise LLMError(f"Google API error ({resp.status_code}): {resp.text[:500]}")
+        raise LLMError(_safe_provider_error("google", resp.status_code, resp.text))
 
     data = resp.json()
+    _check_google_block(data)
     candidates = data.get("candidates", [])
     if not candidates:
         raise LLMError("Google API returned no candidates")
@@ -379,7 +461,7 @@ async def _call_azure(
 
     resp = await client.post(url, headers=headers, json=payload)
     if resp.status_code != 200:
-        raise LLMError(f"Azure API error ({resp.status_code}): {resp.text[:500]}")
+        raise LLMError(_safe_provider_error("azure", resp.status_code, resp.text))
 
     data = resp.json()
     return {
@@ -408,7 +490,7 @@ async def _stream_azure(
     async with client.stream("POST", url, headers=headers, json=payload) as resp:
         if resp.status_code != 200:
             body = await resp.aread()
-            raise LLMError(f"Azure API error ({resp.status_code}): {body.decode()[:500]}")
+            raise LLMError(_safe_provider_error("azure", resp.status_code, body.decode("utf-8", errors="replace")))
 
         async for line in resp.aiter_lines():
             if not line.startswith("data: "):
@@ -452,7 +534,7 @@ async def _stream_openai_compatible(
     async with client.stream("POST", url, headers=headers, json=payload) as resp:
         if resp.status_code != 200:
             body = await resp.aread()
-            raise LLMError(f"{provider} API error ({resp.status_code}): {body.decode()[:500]}")
+            raise LLMError(_safe_provider_error(provider, resp.status_code, body.decode("utf-8", errors="replace")))
 
         async for line in resp.aiter_lines():
             if not line.startswith("data: "):
@@ -492,30 +574,52 @@ async def _stream_anthropic(
     payload = _build_anthropic_request(messages, model_name, temperature, stream=True)
 
     usage = {}
+    text_yielded = False
+    stop_reason: Optional[str] = None
+    seen_block_types: set = set()
     async with client.stream("POST", url, headers=headers, json=payload) as resp:
         if resp.status_code != 200:
             body = await resp.aread()
-            raise LLMError(f"Anthropic API error ({resp.status_code}): {body.decode()[:500]}")
+            raise LLMError(_safe_provider_error("anthropic", resp.status_code, body.decode("utf-8", errors="replace")))
 
         async for line in resp.aiter_lines():
             if not line.startswith("data: "):
                 continue
             try:
                 data = json.loads(line[6:])
-                if data.get("type") == "content_block_delta":
+                evt_type = data.get("type")
+                if evt_type == "content_block_start":
+                    block = data.get("content_block", {}) or {}
+                    block_type = block.get("type")
+                    if block_type:
+                        seen_block_types.add(block_type)
+                elif evt_type == "content_block_delta":
                     delta = data.get("delta", {}).get("text", "")
                     if delta:
                         yield delta
-                elif data.get("type") == "message_start":
+                        text_yielded = True
+                elif evt_type == "message_start":
                     msg_usage = data.get("message", {}).get("usage", {})
                     if msg_usage:
                         usage["prompt_tokens"] = msg_usage.get("input_tokens", 0)
-                elif data.get("type") == "message_delta":
+                elif evt_type == "message_delta":
                     delta_usage = data.get("usage", {})
                     if delta_usage:
                         usage["completion_tokens"] = delta_usage.get("output_tokens", 0)
+                    # Audit #58/#83: capture stop_reason for end-of-stream diagnostics.
+                    new_stop = data.get("delta", {}).get("stop_reason")
+                    if new_stop:
+                        stop_reason = new_stop
             except (json.JSONDecodeError, KeyError):
                 continue
+
+    # Audit #125: if the stream produced no text content (e.g. tool_use-only,
+    # thinking-only, or an unexpected refusal), raise explicitly so the user
+    # sees a real error rather than an empty bubble.
+    if not text_yielded:
+        raise LLMError(
+            f"Anthropic stream returned no text content (stop_reason={stop_reason or '?'}, block_types={sorted(seen_block_types)})"
+        )
 
     if usage:
         usage["total_tokens"] = usage.get("prompt_tokens", 0) + usage.get("completion_tokens", 0)
@@ -529,20 +633,29 @@ async def _stream_google(
     temperature: float,
     api_key: str,
 ) -> AsyncIterator[Union[str, Dict]]:
-    url = f"{PROVIDER_CONFIG['google']['base_url']}/models/{model_name}:streamGenerateContent?alt=sse&key={api_key}"
+    # Audit #82/#235: API key moved to `x-goog-api-key` header (audit-Zeitstand `?key=` in URL).
+    url = f"{PROVIDER_CONFIG['google']['base_url']}/models/{model_name}:streamGenerateContent?alt=sse"
+    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
     payload = _build_google_request(messages, temperature, stream=True)
 
     usage = {}
-    async with client.stream("POST", url, json=payload) as resp:
+    text_yielded = False
+    final_finish_reason: Optional[str] = None
+    final_block_reason: Optional[str] = None
+    async with client.stream("POST", url, headers=headers, json=payload) as resp:
         if resp.status_code != 200:
             body = await resp.aread()
-            raise LLMError(f"Google API error ({resp.status_code}): {body.decode()[:500]}")
+            raise LLMError(_safe_provider_error("google", resp.status_code, body.decode("utf-8", errors="replace")))
 
         async for line in resp.aiter_lines():
             if not line.startswith("data: "):
                 continue
             try:
                 data = json.loads(line[6:])
+                # Audit #111: capture pre-generation prompt-block signal
+                prompt_feedback = data.get("promptFeedback") or {}
+                if prompt_feedback.get("blockReason"):
+                    final_block_reason = prompt_feedback["blockReason"]
                 # Capture usage metadata from chunks
                 usage_meta = data.get("usageMetadata")
                 if usage_meta:
@@ -553,13 +666,27 @@ async def _stream_google(
                     }
                 candidates = data.get("candidates", [])
                 if candidates:
+                    # Audit #58/#83 + #111: track finishReason across chunks; the
+                    # final chunk's value tells us if Google blocked the response.
+                    fr = candidates[0].get("finishReason")
+                    if fr:
+                        final_finish_reason = fr
                     parts = candidates[0].get("content", {}).get("parts", [])
                     for part in parts:
                         text = part.get("text", "")
                         if text:
                             yield text
+                            text_yielded = True
             except (json.JSONDecodeError, KeyError):
                 continue
+
+    # Audit #111: post-stream, if Google blocked the prompt or response and no
+    # text was produced, raise explicitly. Don't suppress when partial text was
+    # already yielded — that's a MAX_TOKENS-style truncation, valid content.
+    if final_block_reason and not text_yielded:
+        raise LLMError(f"Google blocked the prompt (reason: {final_block_reason})")
+    if not text_yielded and final_finish_reason in _GOOGLE_BLOCKED_FINISH_REASONS:
+        raise LLMError(f"Google blocked the response (finishReason: {final_finish_reason})")
 
     if usage:
         yield {"usage": usage}

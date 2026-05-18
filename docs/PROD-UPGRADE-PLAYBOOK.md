@@ -368,6 +368,23 @@ Ohne diese Schritte ist die Bildgenerierung nicht nutzbar:
 
 Vor dem Commit das Tag `git tag pre-image-gen` setzen (nur lesen, kein Push — User-Aufgabe). Bei schwerwiegendem Fehler nach dem Deploy: `git reset --hard pre-image-gen` und neu pushen. Die neuen Tabellen (`app_generated_images`, `app_image_style_presets`, `app_user_limits`) und die neuen Spalten an bestehenden Tabellen bleiben in der DB — sie enthalten dann schlimmstenfalls leere Daten. Da alle Änderungen additiv sind, funktioniert der alte Code weiterhin korrekt neben den neuen leeren Tabellen.
 
+### Google API-Key Rotation (obligatorisch ab 2026-05-18 mit Fix #82/#235/#201)
+
+Mit dem G3-Cluster-Fix (2026-05-18) wurde der Google-API-Key vom URL-Query-Parameter `?key=…` auf den `x-goog-api-key`-Header umgestellt. **Vor dem Fix war der Key potenziell bereits exponiert via:**
+- `httpx.RequestError.__str__` (URL embedded in Exception-Repr)
+- Coolify-Container-Stdout-Logs (jede Request-Logger-Zeile mit der URL)
+- Echo'd `?key=` in Google-Error-Body-Fragments die durch `_provider_body` an Clients durchgereicht wurden
+
+**Action nach G3-Deploy:**
+1. Code-Deploy zuerst — stoppt weiteres Leaking
+2. Dann den Google-API-Key in Google Cloud Console rotieren (`https://console.cloud.google.com/apis/credentials`)
+3. Den neuen Key in Coolify-Env `GOOGLE_API_KEY` setzen UND in `app_provider_keys` für den `x-ai`-Provider Wait — Google-Provider, nicht xAI:
+   - Coolify-Env: `GOOGLE_API_KEY=<neuer-Key>`
+   - DB: Admin-UI → Anbieter → Google → Key aktualisieren (oder direkt `UPDATE app_provider_keys SET api_key_encrypted = encrypt(<neuer-Key>) WHERE provider = 'google'`)
+4. Smoke-Test: Chat-Anfrage mit einem Google-Modell (Gemini) absetzen, normale Antwort verifizieren
+
+Wenn der Key nicht rotiert wird, bleibt das Risiko bestehen — jeder mit historischem Coolify-Log-Zugriff hat ihn potenziell schon.
+
 ### #3-Defense (relevant ab 2026-05-18 mit Fix #3)
 
 `backend/app/image_gen.py:check_daily_cost_cap` ist jetzt defensiv gegen fehlende Tabellen (PROD pre-A2-Migration) und transiente Supabase-REST-Outages. Konkret: jeder der 3 Queries (`app_generated_images`-Aggregator, `app_user_limits`-Lookup, `app_settings`-Fallback) ist einzeln in `try/except` gewrappt, mit Logger-Warnung + Fallback-Default.

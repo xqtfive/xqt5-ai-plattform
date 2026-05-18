@@ -1533,13 +1533,19 @@ async def admin_list_provider_models(
             if provider == "anthropic":
                 headers["anthropic-version"] = "2023-06-01"
             if provider == "google":
-                url = f"{config['base_url']}/models?key={api_key}"
-                resp = await client.get(url)
+                # Audit #82/#235 sibling site (#201): Google API key in
+                # `x-goog-api-key` header, not `?key=` URL query.
+                url = f"{config['base_url']}/models"
+                resp = await client.get(url, headers={"x-goog-api-key": api_key})
             else:
                 url = f"{config['base_url']}/models"
                 resp = await client.get(url, headers=headers)
 
             if resp.status_code != 200:
+                logger.warning(
+                    "admin_list_provider_models: provider=%s status=%s body=%r",
+                    provider, resp.status_code, resp.text[:500],
+                )
                 raise HTTPException(status_code=502, detail=f"Provider API error: {resp.status_code}")
 
             data = resp.json()

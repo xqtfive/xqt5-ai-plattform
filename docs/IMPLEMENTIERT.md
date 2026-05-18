@@ -1311,3 +1311,140 @@ Null. `Bilder.jsx:110-114` und `api.js:773-789` senden nur `{prompt, model, sour
 - **Blast-Radius Analyst** — kartierte P7-Pattern (4 Geschwister-Findings); konkrete Allowlist-Vorschläge per Provider
 
 Konsens: 🔴 Kritisch, heute exploitable, Frontend-impact null. Empty-Allowlist + `extra='forbid'` ist der konservative v1-Schluss.
+
+---
+
+## Bugfix G3 Cluster — Provider-Layer Hygiene in `llm.py` (2026-05-18)
+
+**Anlass:** BUG-FIX-PLAYBOOK G3 (Provider-Layer Hygiene). Audit-Findings #57/#255, #82/#235, #87, #111, #125 — alle in `backend/app/llm.py` und betreffen Provider-Error-Path-Hygiene + API-Key-Exposure + Silent-Empty-Content. Phase-A nach neuen Dispatch-Regeln mit 4 Opus-Agenten (Informed + Framework-Runtime-Researcher + Red-Team-Refuter + Blast-Radius). Agenten haben 3 zusätzliche Sibling-Sites entdeckt die das Audit nicht aufgelistet hatte; alle co-gefixt im selben Commit.
+
+### Phase-A-Erkenntnisse
+
+- **Framework-Runtime-Researcher** zitierte direkt Anthropic + Google Docs:
+  - Anthropic Content-Block-Vocabulary: `text, thinking, redacted_thinking, tool_use, server_tool_use, web_search_tool_result, code_execution_tool_result, document, image, search_result, …` (https://platform.claude.com/docs/en/api/messages)
+  - Google `finishReason` Werte: `STOP, MAX_TOKENS, SAFETY, RECITATION, LANGUAGE, OTHER, BLOCKLIST, PROHIBITED_CONTENT, SPII` (https://ai.google.dev/api/generate-content#FinishReason)
+  - Google API auth: `x-goog-api-key`-Header ist die kanonische Form per `https://ai.google.dev/gemini-api/docs/api-key`
+  - Anthropic Error-Envelope: `{"type":"error","error":{"type":"...","message":"..."}}`
+  - Google Error-Envelope: `{"error":{"code":N,"message":"...","status":"..."}}`
+
+- **Red-Team-Refuter** fand:
+  - #87 ist im aktuellen Code REFUTED — der existierende `block.get("type") == "text"`-Filter an `llm.py:282` verhindert den KeyError bereits. Aufgenommen ins Refutations-Register §4.
+  - #82/#235 P0-Verdict: Google-Key ist potenziell bereits via Coolify-Container-Logs / httpx-RequestError-Reprs exponiert. **Rotation post-Deploy obligatorisch.**
+  - 3 zusätzliche Sibling-Sites entdeckt die das Audit nicht aufgelistet hatte:
+    - `providers.py:174` (test_provider Google-Connectivity-Test) — selber `?key=` Anti-Pattern als #82
+    - `main.py:1536` (admin_list_provider_models Google-Branch) — selber `?key=` Anti-Pattern (= Audit-Fund #201)
+    - `rag.py:608` (embedding error site) — selber `resp.text[:500]` Anti-Pattern als #57
+
+### Befund
+
+**#57/#255 — Provider-Error-Body Leak (8 Sites in llm.py + 3 Siblings):**
+```python
+# Pre-fix pattern, 8× in llm.py + sibling sites
+raise LLMError(f"{provider} API error ({resp.status_code}): {resp.text[:500]}")
+```
+`main.py:881-882` (Stream) und `main.py:783-784` (Non-Stream) emittieren `data: {"error": str(e)}` SSE-Frame bzw. `HTTPException(detail=str(e))` — der rohe Provider-Body landet wortwörtlich beim React-Frontend. Bei Google-4xx echo'd der Body die Request-URL inkl. `?key=…` → User-sichtbarer API-Key-Leak.
+
+**#82/#235/#201 — Google API-Key in URL-Query (4 Sites):**
+```python
+# Pre-fix pattern, 4×
+url = f".../models/{model_name}:generateContent?key={api_key}"
+```
+Key in `httpx`-`RequestError.__str__`, Coolify-Access-Logs, und potenziell in echoed-URL-Fields von Google-Error-Bodies. Verifier-A bestätigte dass Google REST-API beide Auth-Formen akzeptiert; `x-goog-api-key`-Header ist die offiziell empfohlene Form.
+
+**#87 — Anthropic `block["text"]` KeyError — REFUTED:**
+Der existierende Filter `block.get("type") == "text"` an `llm.py:282` verhindert den unguarded `block["text"]`-Zugriff bereits heute. Audit-Pattern beschreibt einen Crash-Pfad, der praktisch nicht erreichbar ist. Aufgenommen ins Refutations-Register.
+
+**#111 — Google SAFETY-Block silent empty:**
+`_call_google` an L307: `candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")` resolviert bei `finishReason="SAFETY"` zu `""` — leere Assistant-Message in DB, User zahlt Prompt-Tokens. `_stream_google` an L554-560 hatte den gleichen Bug.
+
+**#125 — Anthropic non-text-Block silent empty:**
+`_call_anthropic` an L282 filtert auf `type == "text"` und joined — bei tool_use-only- oder thinking-only-Response = `text=""`. `_stream_anthropic` an L500-518 yielded nur `content_block_delta.text` — andere Delta-Types (`thinking_delta`, `input_json_delta`, `signature_delta`) werden gedroppt.
+
+### Fix — vier Gruppen
+
+**Gruppe 1 — `_safe_provider_error(provider, status, raw_body)`-Helper (neue Funktion in llm.py, near LLMError):**
+
+Parsed JSON-Envelope, extrahiert nur `error.message`, fällt zurück auf `HTTP {status}`. Loggt vollen Body via `logger.warning` (Coolify-Stdout, niemals `app_audit_logs` — SECURITY.md:209 wird gewahrt). User sieht nur `{provider} API error ({status}): {sanitized_message_or_nothing}`. Newlines werden aus dem Message entfernt (SSE-Safety). Cap auf 200 Chars.
+
+Angewendet an 11 Sites:
+- llm.py: L251 (_call_openai_compatible), L278 (_call_anthropic), L301 (_call_google), L382 (_call_azure), L411 (_stream_azure), L455 (_stream_openai_compatible), L498 (_stream_anthropic), L539 (_stream_google) = 8 Sites
+- rag.py:608 (Embedding) — sanitized inline (RuntimeError, kein LLMError), gleiches Pattern
+- providers.py:190 (test_provider error response) — inline sanitized
+- main.py:1543 (admin_list_provider_models error response) — inline sanitized
+
+**Gruppe 2 — Google API-Key URL → Header (4 Sites):**
+- `llm.py:296` (`_call_google`): `?key={api_key}` weg, neue `headers={"x-goog-api-key": api_key, "Content-Type": "application/json"}`
+- `llm.py:532` (`_stream_google`): identisch
+- `providers.py:174` (test_provider Google-Branch): identisch
+- `main.py:1536` (admin_list_provider_models Google-Branch): identisch
+
+**Gruppe 3 — Google Block-Detection (`_check_google_block` + Stream-Tracking):**
+
+Neue Konstante:
+```python
+_GOOGLE_BLOCKED_FINISH_REASONS = frozenset({"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"})
+```
+
+Helper-Funktion `_check_google_block(data)`:
+- Raised `LLMError("Google blocked the prompt (reason: {block_reason})")` wenn `promptFeedback.blockReason` gesetzt
+- Raised `LLMError("Google blocked the response (finishReason: {finish_reason})")` wenn `candidates[0].finishReason ∈ _GOOGLE_BLOCKED_FINISH_REASONS`
+- `MAX_TOKENS`, `LANGUAGE`, `OTHER`, `STOP`, fehlend → durchlässig (gültige Truncation/normale Antwort)
+
+Angewendet:
+- `_call_google`: nach `candidates`-Check, vor Text-Extraktion
+- `_stream_google`: trackt `final_finish_reason` über alle Chunks + `final_block_reason` aus `promptFeedback`; raised am Stream-Ende wenn blockiert und kein Text geliefert (`text_yielded` Flag)
+
+**Gruppe 4 — Anthropic Non-Text-Block-Detection:**
+
+- `_call_anthropic`: nach `"".join(...)` text-Concatenation prüft auf `not text`. Falls leer: raised `LLMError("Anthropic returned no text content (stop_reason={...}, block_types=[...])")` mit den observed block-types und stop_reason für Forensik.
+- `_stream_anthropic`: trackt `text_yielded`, `seen_block_types` (aus `content_block_start`-Events), `stop_reason` (aus `message_delta.delta.stop_reason`). Am Stream-Ende, falls `not text_yielded`: raised `LLMError("Anthropic stream returned no text content (stop_reason=..., block_types=[...])"`).
+
+### Auswirkung
+
+| Szenario | Vor Fix | Nach Fix |
+|---|---|---|
+| Google 429 mit echoed URL `?key=…` | Key im SSE-Error-Frame zum Browser | Key nicht in URL; Body sanitized; nur `"google API error (429): rate limit exceeded"` |
+| Anthropic 400 mit Prompt-Echo | Prompt-Fragment im Error sichtbar für User | Nur `error.message` extrahiert + sanitized |
+| Google SAFETY-Block | leere Assistant-Bubble, Tokens berechnet, keine Diagnostik | Expliziter `LLMError("Google blocked the response (finishReason: SAFETY)")` → User sieht klare Meldung |
+| Anthropic tool_use-only Response | leere Assistant-Bubble | Expliziter `LLMError` mit `block_types=['tool_use']` + `stop_reason='tool_use'` |
+| Google API-Key in Coolify-Logs | Key im URL-Querystring sichtbar | Key nur im Header (nicht in `httpx.RequestError.__str__`, nicht in URL-Field) |
+
+### Bewusste Out-of-Scope
+
+- **#58/#83** (stop_reason/finish_reason ignored) — naturally subsumed durch #111 (für Google) und #125 (für Anthropic). Stream-Tracking für die anderen Provider (OpenAI-compat, Azure) bleibt offen — separater Cycle.
+- **#247** (Retry/Backoff anywhere in llm.py) — benötigt Tenacity-Dependency, deferred.
+- **#234** (Stream Partial-Write-Orphan in main.py) — separater Persistierungs-Concern, nicht G3.
+- **OpenAI/Mistral/xAI safety/finish-reason analog** — diese Provider haben andere Block-Vocabularies (z.B. `finish_reason="content_filter"` für OpenAI). Separate G3-Erweiterung.
+- **Frontend-Anpassung für `thinking`/`tool_use`-Block-Surface** — heute kein Bedarf (Platform nutzt diese Features nicht), zukünftig.
+
+### Erforderliche PROD-Action (post-Deploy)
+
+**`GOOGLE_API_KEY` rotieren.** Red-Team-Verdict: der Key war potenziell bereits in Coolify-Container-Logs sichtbar via:
+- httpx `RequestError.__str__` (URL embedded)
+- Coolify reverse-proxy access logs
+- echoed `?key=` in Google-Error-Bodies vor dem Fix
+
+Order: Deploy zuerst (Code stoppt weiteres Leaking) → dann Key rotieren in Coolify-Env + Provider-DB.
+
+### Berührte Dateien
+
+**Code:**
+- `backend/app/llm.py` — neuer `_safe_provider_error`-Helper, neue `_GOOGLE_BLOCKED_FINISH_REASONS`-Konstante, neuer `_check_google_block`-Helper, Modifikationen an `_call_openai_compatible`/`_call_anthropic`/`_call_google`/`_call_azure`/`_stream_azure`/`_stream_openai_compatible`/`_stream_anthropic`/`_stream_google`
+- `backend/app/providers.py` — `test_provider` Google-Branch (Header statt URL) + sanitized error response
+- `backend/app/main.py` — `admin_list_provider_models` Google-Branch (Header statt URL) + sanitized error response
+- `backend/app/rag.py` — `generate_embeddings` error site sanitized
+
+**Docs:**
+- `docs/IMPLEMENTIERT.md` — dieser Eintrag
+- `docs/BUG-AUDIT-2026-05-13.md` — #57/#255, #82/#235, #111, #125 auf FIXED 2026-05-18; #87 auf REFUTED 2026-05-18
+- `docs/BUG-FIX-PLAYBOOK.md` — G3-Rows geflippt, §5-Eintrag, §4 Refutations-Register um #87 ergänzt
+- `docs/SECURITY.md` — neue „Provider-Error-Body Sanitization"-Sektion + Google-Auth-Header-Notiz
+- `docs/CODING-DOKUMENT.md` — neue Regel 10 über Provider-Error-Body-Handling
+- `docs/PROD-UPGRADE-PLAYBOOK.md` — Google-Key-Rotation-Step nach G3-Deploy
+
+### Phase-A-Verifikationsteam (4 Opus-Agenten, neue Dispatch-Regeln)
+
+- **Informed Verifier** — splitete jede der 5 Findings in (a) statische Code-Pattern und (b) Runtime-Behavior-Claim; lieferte file:line-Evidence pro Hälfte separat
+- **Framework-Runtime-Researcher** — zitierte Anthropic + Google Doc-URLs direkt; verifizierte API-Auth-Header-Form als kanonisch
+- **Red-Team Refuter** — fand 3 zusätzliche Sibling-Sites die das Audit nicht aufgelistet hatte; klassifizierte #82 als P0 mit Key-Rotation-Empfehlung; refutierte #87 als nicht-mehr-erreichbar im aktuellen Code
+- **Blast-Radius Analyst** — kartierte LLMError-Catcher in main.py (4 Sites: 783, 881, 2204, 2279); frontend-side `extractDetail`-Handling; adjacent #58/#83 als naturally-subsumed identifiziert

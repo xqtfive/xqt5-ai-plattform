@@ -605,7 +605,14 @@ async def generate_embeddings(texts: List[str]) -> List[List[float]]:
     async with httpx.AsyncClient(timeout=60.0) as client:
         resp = await client.post(url, headers=headers, json=body)
         if resp.status_code != 200:
-            raise RuntimeError(f"Embedding API error ({provider}) {resp.status_code}: {resp.text[:300]}")
+            # Audit #57/#255 sibling site: don't echo raw provider error body
+            # to callers (the embedding error eventually surfaces in user-visible
+            # upload/RAG flows). Log full body server-side for ops triage.
+            logger.warning(
+                "Embedding API error provider=%s status=%s body=%r",
+                provider, resp.status_code, resp.text[:500],
+            )
+            raise RuntimeError(f"Embedding API error ({provider}) {resp.status_code}")
         data = resp.json()
 
     return [item["embedding"] for item in data["data"]]

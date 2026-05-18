@@ -171,8 +171,11 @@ async def test_provider(provider: str) -> Dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             if provider == "google":
-                url = f"{config['base_url']}/models?key={key}"
-                resp = await client.get(url)
+                # Audit #82/#235 sibling site: Google API key in `x-goog-api-key`
+                # header rather than `?key=` URL query (prevents leak via access
+                # logs / httpx error reprs / echoed-URL error bodies).
+                url = f"{config['base_url']}/models"
+                resp = await client.get(url, headers={"x-goog-api-key": key})
             else:
                 url = f"{config['base_url']}/models"
                 headers = {
@@ -185,9 +188,14 @@ async def test_provider(provider: str) -> Dict[str, Any]:
             if resp.status_code == 200:
                 return {"success": True, "message": "Verbindung erfolgreich"}
             else:
+                # Audit #57/#255 sibling: don't echo raw provider body to admin UI.
+                logger.warning(
+                    "Provider connectivity test failed provider=%s status=%s body=%r",
+                    provider, resp.status_code, resp.text[:500],
+                )
                 return {
                     "success": False,
-                    "error": f"HTTP {resp.status_code}: {resp.text[:200]}",
+                    "error": f"HTTP {resp.status_code}",
                 }
     except httpx.TimeoutException:
         return {"success": False, "error": "Timeout bei der Verbindung"}
