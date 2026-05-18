@@ -183,6 +183,7 @@ Diese wurden bereits adressiert. Re-Verifikation in Phase A würde "ALREADY-FIXE
 | #230 | xAI-Provider-Name-Mismatch (`xai` vs `x-ai`) | `image_gen.py:203, 254` | VERIFIED-MULTI | image_gen.py — Renaming auf `x-ai` |
 | #247 | Kein Retry/Backoff anywhere in `llm.py` | `llm.py` gesamt | VERIFIED-MULTI | llm.py — Tenacity oder eigenes Backoff-Pattern |
 | #274 | Cohere half-wired (`KNOWN_PROVIDERS` aber kein `PROVIDER_CONFIG`-Eintrag) | `providers.py:13` + `llm.py:18–58` | VERIFIED-MULTI | Entweder Cohere implementieren oder aus KNOWN_PROVIDERS entfernen |
+| #278 | `httpx.AsyncClient(timeout=30.0)` zu eng für gpt-image-1 (regelmäßig 40-90+ s) — empirisch 100% Failure-Rate; Coolify-Traefik-Upstream-Default 60 s als praktische Decke | `image_gen.py:157, 210` | FIXED 2026-05-18 (verifizierter Fund nach 2026-05-13) |
 
 ### Gruppe G4 — RAG-Pipeline-Korrektheit
 
@@ -208,6 +209,7 @@ Diese wurden bereits adressiert. Re-Verifikation in Phase A würde "ALREADY-FIXE
 | #179 | `asyncio.CancelledError` leaks pending Image-Rows | `image_gen.py:392–419` | VERIFIED-MULTI | image_gen.py + möglicherweise rechunk-equivalent |
 | #200 | Streaming-SSE keine AbortController | `api.js:998–1042, 712–756` | VERIFIED-MULTI | api.js — AbortController-Pattern |
 | #150 | `asyncio.create_task` Referenz nicht retained | `main.py:811, 878, 2197, 2264` | VERIFIED-MULTI | main.py — `_BG_TASKS`-Set + add_done_callback |
+| #279 | `except Exception`-Catch-all schreibt `str(exc)[:500]` (leer für httpx-Timeout-Klassen) und ruft kein `logger.error` — Python-Level-Failures unsichtbar | `image_gen.py:409–419` | FIXED 2026-05-18 (verifizierter Fund nach 2026-05-13) |
 
 ### Gruppe G6 — File-Upload / OCR / Documents
 

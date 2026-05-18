@@ -154,7 +154,7 @@ async def _call_openai(
     payload: Dict[str, Any] = {"model": model_name, "prompt": prompt, "n": 1}
     payload.update(parameters)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
             "https://api.openai.com/v1/images/generations",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
@@ -207,7 +207,7 @@ async def _call_xai(
     payload: Dict[str, Any] = {"model": model_name, "prompt": prompt, "n": 1}
     payload.update(parameters)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=60.0) as client:
         response = await client.post(
             "https://api.x.ai/v1/images/generations",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
@@ -407,7 +407,14 @@ async def generate_image_for_user(
         )
         raise
     except Exception as exc:
-        error_msg = str(exc)[:500]
+        exc_class = type(exc).__name__
+        exc_detail = str(exc) or repr(exc)
+        error_msg = f"{exc_class}: {exc_detail}"[:500]
+        logger.error(
+            "Image generation failed image_id=%s provider=%s model=%s",
+            image_id, provider, model,
+            exc_info=True,
+        )
         mark_image_failed(image_id, error_msg)
         audit.log_event(
             action=audit.IMAGE_GENERATE_FAILED,

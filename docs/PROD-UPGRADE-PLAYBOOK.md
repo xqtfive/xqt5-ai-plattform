@@ -368,6 +368,19 @@ Ohne diese Schritte ist die Bildgenerierung nicht nutzbar:
 
 Vor dem Commit das Tag `git tag pre-image-gen` setzen (nur lesen, kein Push — User-Aufgabe). Bei schwerwiegendem Fehler nach dem Deploy: `git reset --hard pre-image-gen` und neu pushen. Die neuen Tabellen (`app_generated_images`, `app_image_style_presets`, `app_user_limits`) und die neuen Spalten an bestehenden Tabellen bleiben in der DB — sie enthalten dann schlimmstenfalls leere Daten. Da alle Änderungen additiv sind, funktioniert der alte Code weiterhin korrekt neben den neuen leeren Tabellen.
 
+### Traefik-Upstream-Timeout (relevant ab 2026-05-18 mit Fix #278)
+
+`backend/app/image_gen.py` ruft die OpenAI- und xAI-Bildgenerierungs-Endpoints mit `httpx.AsyncClient(timeout=60.0)`. Coolifys Traefik hat per Default einen 60-s-Upstream-Timeout pro Service. Wenn in PROD gpt-image-1-Generierungen länger als 60 s benötigen (etwa bei HD-Qualität mit komplexen Prompts), entsteht ein 502 von Traefik **bevor** der Backend-Handler antworten kann.
+
+**Wenn 502s nach Image-Gen-Calls in PROD-Logs auftauchen ohne entsprechende Backend-Logger-Einträge:** Traefik-Service-Config in Coolify anpassen, z. B. via Custom-Labels:
+
+```
+traefik.http.middlewares.image-timeout.headers.customResponseHeaders.X-Image-Timeout=120
+# und passender Service-Level-Timeout im Coolify-UI auf 120 s
+```
+
+Auf DEV ist das aktuell nicht beobachtet — die meisten Generierungen liegen unter 60 s. Wenn das ändert oder ein Image-Modell mit höherer Latenz registriert wird, hier dokumentieren und Traefik-Side anpassen.
+
 ---
 
 ## Notfall-Kontakte / Eskalation

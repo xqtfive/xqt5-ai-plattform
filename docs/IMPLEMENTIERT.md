@@ -850,3 +850,87 @@ Vier parallele Opus-Agenten 2026-05-18, unabhängige Reports:
 - **Verifier D** (Blast-Radius / Dependency-Mapping): identifizierte #24 als direkt verknüpft, empfahl Bundling; identifizierte #3 als PROD-Reachability-Risiko
 
 Anschließend ein fünfter Opus-Reviewer auf den fertigen Fix-Plan: VERDICT green-with-caveats (Caveats: Line-Number-Drift dokumentieren, PROD-#3-Reachability flaggen — beide adressiert).
+
+---
+
+## Bugfix #278 + #279 — Image-Gen-Timeout + diagnostizierbarer Error-Path (2026-05-18)
+
+**Anlass:** Im DEV-Test der wiederhergestellten `POST /api/images/generate`-Route (nach Fix #1+#24) trat eine 100%ige Failure-Rate auf `gpt-image-1`-Anfragen auf. Audit-Log-Forensik zeigte: `image.generate.failed` exakt 30.08 s nach `image.generate` (Start) — die Signatur eines `httpx.AsyncClient(timeout=30.0)`-Read-Timeouts. `error_message` und `audit metadata.error_truncated` waren leer; der Catch-all-Branch verlor den Exception-Typ vollständig.
+
+### Befund
+
+**#278 — Timeout zu eng:** `image_gen.py:157` (OpenAI) und `:210` (xAI) verwenden beide `httpx.AsyncClient(timeout=30.0)`. Ein einzelner Float für `timeout` ist eine unified `httpx.Timeout(30.0)`, die auf connect/read/write/pool zusammen wirkt. `gpt-image-1` rendert serverseitig regelmäßig 40-90+ s; der 30-s-Read-Timeout greift mitten in der Generierung. Andere `httpx`-Timeouts im Codebase liegen bei 60-120 s — die 30 s im Image-Gen-Pfad sind ein Ausreißer.
+
+**#279 — Catch-all verliert Diagnostik:** `image_gen.py:409-419` `except Exception as exc:` schreibt `str(exc)[:500]` in `app_generated_images.error_message` und audit `metadata.error_truncated`. Für `httpx.ReadTimeout` (und Geschwister-Klassen) ist `str(exc)` leer — Begründung: httpcore mappt Pythons builtin `TimeoutError()` (keine Message) auf `httpcore.ReadTimeout`; httpx remappt dann mit `message = str(exc)` (also `""`) und re-raised `httpx.ReadTimeout("")`. Class-Chain: `httpx.ReadTimeout → TimeoutException → TransportError → RequestError → HTTPError → Exception` (wird also vom `except Exception` aber NICHT vom `except HTTPException` gefangen). Zusätzlich kein `logger.error` im Branch — kein Stack-Trace in den Coolify-Logs.
+
+### Fix
+
+**#278 — Timeout-Bump auf 60.0 s** an beiden Call-Sites:
+
+- `image_gen.py:157`: `httpx.AsyncClient(timeout=60.0)` (OpenAI)
+- `image_gen.py:210`: `httpx.AsyncClient(timeout=60.0)` (xAI)
+
+60 s gewählt weil: (a) Coolify-Traefik-Default für Upstream-Timeout ist 60 s — höher zu gehen würde die 502-Failure-Mode nur an die Proxy-Schicht verschieben; (b) deckt p90 der `gpt-image-1`-Latenz ab; (c) konsistent mit anderen Backend-Timeouts (llm.py:221, rag.py:604, providers).
+
+**#279 — Catch-all diagnostizierbar gemacht:** im `except Exception`-Block:
+
+```python
+exc_class = type(exc).__name__
+exc_detail = str(exc) or repr(exc)
+error_msg = f"{exc_class}: {exc_detail}"[:500]
+logger.error(
+    "Image generation failed image_id=%s provider=%s model=%s",
+    image_id, provider, model,
+    exc_info=True,
+)
+```
+
+Eigenschaften des neuen Pfads:
+- **Exception-Klasse immer im error_msg** — auch wenn `str(exc)` leer ist (Timeout-Fall), steht „ReadTimeout:" oder ähnlich in der Audit-Spalte.
+- **`str(exc) or repr(exc)`** als Fallback — `repr` greift nur wenn `str()` leer.
+- **`logger.error(..., exc_info=True)`** — voller Stack-Trace landet in Coolify-Logs (nicht in der Audit-DB, damit `SECURITY.md:209` „Prompts nie in Logs" gewahrt bleibt; der Logger schreibt nur image_id/provider/model + Traceback ohne Lokals).
+- **Truncation auf 500 Zeichen** beibehalten — DB-Schema-konform.
+- **502-Status beibehalten** — Frontend-Bilder-Komponente erwartet das.
+
+Die HTTPException-Branch (für non-200-OpenAI/xAI-Responses) bleibt unberührt, weil sie bereits eigene `logger.error`-Calls hat (`image_gen.py:165, 218`) und das `_provider_body`-Attribute für Moderation-Detection setzt.
+
+### Auswirkung
+
+| Vor Fix | Nach Fix |
+|---|---|
+| 30 s Read-Timeout für gpt-image-1 → 100% Failure | 60 s Read-Timeout → erwartete Success-Rate p90+ |
+| Audit-Failure-Row mit `error_truncated=""` | Audit-Failure-Row mit `error_truncated="ReadTimeout: …"` |
+| Kein Stack-Trace in Coolify-Logs | Voller Stack-Trace + strukturierte Log-Zeile pro Failure |
+
+### Bewusste Out-of-Scope
+
+- **Audit #179** (`asyncio.CancelledError` als `BaseException` nicht von `except Exception` gefangen) — separate Finding, nicht gebündelt, weil dieser Fix das Cancel-Verhalten nicht ändert (es war vorher schon nicht im Scope und ist es weiterhin nicht).
+- **Per-Modell-konfigurierbare Timeouts** (`app_model_config.parameters.timeout_s`) — Future-Feature.
+- **Retry/Backoff** im Image-Gen-Pfad — koordiniert mit Audit #247 (kein Retry in `llm.py`), nicht ad-hoc hier einführen.
+- **Code-Deduplikation** zwischen `_call_openai` und `_call_xai` (~50 LOC nahezu identisch) — Verifier C-Smell, separater Refactor.
+
+### PROD-Reachability-Hinweis
+
+Coolify-Traefik hat eine Default-Upstream-Timeout von 60 s pro Service. Sollte gpt-image-1 in PROD weiterhin häufig 502en (weil > 60 s benötigt), muss zusätzlich die Traefik-Konfiguration angepasst werden — siehe `PROD-UPGRADE-PLAYBOOK.md` Abschnitt „Bildgenerierung". Auf DEV ist das aktuell nicht beobachtet.
+
+### Berührte Dateien
+
+**Code:**
+- `backend/app/image_gen.py` — 2 Timeout-Zeilen + 5-Zeilen-Rewrite des Catch-all-Blocks
+
+**Docs:**
+- `docs/IMPLEMENTIERT.md` — dieser Eintrag
+- `docs/BUG-AUDIT-2026-05-13.md` — neuer Abschnitt „Spätere Findings" mit #278 und #279
+- `docs/BUG-FIX-PLAYBOOK.md` — #278 in Gruppe G3 (Provider-Layer-Hygiene), #279 in Gruppe G5 (Stream-Lifecycle)
+- `docs/PROD-UPGRADE-PLAYBOOK.md` — Traefik-Upstream-Timeout-Hinweis im Bildgenerierung-Abschnitt
+
+### Phase-A-Verifikationsteam
+
+Vier parallele Opus-Agenten 2026-05-18, unabhängige Reports:
+
+- **Verifier A** (informiert, Timeout-Mechanism): bestätigte httpx 0.28.1 pinning + traced die Empty-Message-Kette httpcore→httpx → VERDICT still-real
+- **Verifier B** (informiert, Error-Path): bestätigte Error-Path-Asymmetrie zwischen HTTP-Status- und Python-Exception-Branches; identifizierte CancelledError-Edge-Case als Out-of-Scope → VERDICT still-real
+- **Verifier C** (impartial, Cold-Eyes): VERDICT „inappropriate timeout, high concern on logging absence" — unabhängige Bestätigung
+- **Verifier D** (Blast-Radius): identifizierte Coolify-Traefik-60s-Default als praktische Decke; identifizierte #179 als ordering-relevant aber nicht bundling-pflichtig → empfahl 60 s als sicherer Default
+
+Konsens: 4-of-4 still-real, beide Findings.
