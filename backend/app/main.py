@@ -74,6 +74,7 @@ from . import providers as providers_mod
 from . import rag as rag_mod
 from . import storage
 from . import templates as templates_crud
+from .database import supabase
 from .token_tracking import record_usage
 
 logger = logging.getLogger(__name__)
@@ -2378,7 +2379,7 @@ async def delete_generated_image(
     if image["user_id"] != current_user["id"]:
         raise HTTPException(status_code=404, detail="Bild nicht gefunden")
 
-    supabase.table("app_generated_images").delete().eq("id", image_id).execute()
+    supabase.table("app_generated_images").delete().eq("id", image_id).eq("user_id", current_user["id"]).execute()
 
     audit.log_event(
         audit.IMAGE_DELETE,

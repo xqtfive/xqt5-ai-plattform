@@ -124,6 +124,7 @@ Diese wurden bereits adressiert. Re-Verifikation in Phase A würde "ALREADY-FIXE
 - FEATURE-DOKUMENT.md:411–432 obsoleter Block gelöscht
 - IMPLEMENTIERT.md A2-Status präzisiert auf „dev-vollständig"
 - Phase 3.1 Matrix-Track geparkt in `PHASE3-MATRIX-SHELVED.md`
+- **#1 + #24 (2026-05-18)** — `main.py:77` Modul-Scope-Import `from .database import supabase` ergänzt (POST `/api/images/generate` chat-anchored + DELETE `/api/images/{id}` wiederhergestellt); `main.py:2382` (post-fix; audit-Zeitstand L2381) DELETE-Statement um `.eq("user_id", current_user["id"])` erweitert (TOCTOU-Window geschlossen). Phase-A-Re-Verifikation mit 4 parallelen Opus-Agenten 2026-05-18 — Audit-Scope für #1 war unterschätzt (POST-Pfad ebenfalls betroffen). Details: `IMPLEMENTIERT.md` „Bugfix #1 + #24 (2026-05-18)".
 
 ---
 

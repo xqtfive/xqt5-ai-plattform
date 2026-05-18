@@ -789,3 +789,64 @@ v2 (geplant): Supabase Storage als permanenter Speicher; `storage_kind = 'supaba
 Details siehe `docs/PROD-UPGRADE-PLAYBOOK.md` — Abschnitt „Bildgenerierung".
 
 Dateien: `frontend/src/App.jsx`, `frontend/src/components/PoolDetail.jsx`
+
+---
+
+## Bugfix #1 + #24 — `supabase`-Import + DELETE-WHERE-Härtung (2026-05-18)
+
+**Anlass:** Audit-Runde 2026-05-13 (`BUG-AUDIT-2026-05-13.md` Funde #1 und #24). Phase-A-Re-Verifikation 2026-05-18 mit vier parallelen Opus-Agenten (informiert/impartial/blast-radius) bestätigte den Bug live und deckte zusätzlich auf, dass die ursprüngliche Audit-Beschreibung den Scope unterschätzt hatte: nicht nur `DELETE /api/images/{id}` war betroffen, sondern auch `POST /api/images/generate` auf dem chat-/pool-chat-verankerten Pfad.
+
+### Befund
+
+`backend/app/main.py` referenzierte den nackten Namen `supabase` in vier Routen-Handler-Zeilen (audit-Zeitstand 2303, 2316, 2369, 2381) ohne entsprechenden Modul-Import. Zwei funktionslokale Imports an L1961 (`as db`) und L2493 (`as _sb`) existierten, banden aber jeweils Aliase und nicht den Bare-Namen. Konsequenz: `NameError` zur Laufzeit, HTTP 500.
+
+- **`POST /api/images/generate`** (Handler `generate_image`): 500 wenn `chat_id` oder `pool_chat_id` im Request-Body — der Standard-Pfad bei Bildgenerierung aus einem Chat-Kontext heraus.
+- **`DELETE /api/images/{image_id}`** (Handler `delete_generated_image`): 500 bei jedem Löschklick im Bilder-Galerie-Tab — 100% Fehlerquote.
+
+Zusätzlich war die DELETE-Statement ohne `eq("user_id")` in der WHERE-Klausel formuliert (Fund #24). Der App-Layer-Owner-Check vor der DELETE (SELECT-then-compare) hatte ein TOCTOU-Fenster, das durch eine atomare WHERE-Klausel zu schließen war.
+
+### Fix
+
+1. Modul-Scope-Import `from .database import supabase` an `main.py:77` ergänzt — kanonisches Muster, das 13 andere Backend-Module bereits verwenden (`audit.py:4`, `pools.py:9`, `storage.py:3`, `image_gen.py:12` u.a.). `main.py` war der einzige Verstoß.
+2. DELETE-Statement an `main.py:2382` (post-fix; audit-Zeitstand L2381) um `.eq("user_id", current_user["id"])` erweitert. SQL-Filter erzwingt jetzt Owner-Match direkt; das App-Layer-Check bleibt zusätzlich erhalten (Defense-in-Depth, kein Verhaltensunterschied im Happy-Path).
+
+Die funktionslokalen Imports an L1962 und L2494 (post-fix Zeilen) bleiben unverändert; sie aliasen auf `db` / `_sb` und überschatten den neuen Modul-Scope-Namen nicht. Cleanup dieser redundanten Lokal-Imports ist explizit out-of-scope dieses Commits.
+
+### Auswirkung
+
+| Route | Vor Fix | Nach Fix |
+|---|---|---|
+| `POST /api/images/generate` (chat-anchored) | HTTP 500 (NameError) | funktioniert |
+| `POST /api/images/generate` (Galerie-direkt) | funktionierte bereits | unverändert |
+| `DELETE /api/images/{image_id}` | HTTP 500 (NameError) | funktioniert + atomar owner-gefiltert |
+
+Frontend-Aufrufer: `frontend/src/api.js:778` (Bilder-Generate), `frontend/src/api.js:810` (Bilder-Delete via `frontend/src/components/Bilder.jsx:137`).
+
+### Keine Schema-/Migrations-Änderung
+
+Der Bug war rein pythonisch (Modul-Import-Versäumnis). Die Supabase-Instanz, das `app_generated_images`-Schema, RLS-Regeln und RPCs blieben unberührt. PROD-Catchup-Track ist unabhängig.
+
+### PROD-Reachability-Hinweis (für die Prod-Catchup-Planung)
+
+Sobald dieser Fix auch auf PROD ankommt, wird `POST /api/images/generate` dort wieder den `image_gen_mod.generate_image_for_user`-Pfad erreichen. Der Audit-Fund **#3** (`image_gen.py:67–87` — `app_user_limits` + Setting-Lookup ohne try/except) ist auf PROD weiter offen, weil A2 dort noch nicht angewendet ist (siehe Memory `project_xqt5_dev_prod_state.md`). Auf DEV ist A2 angewendet und damit unkritisch; auf PROD würde der wiederhergestellte Endpoint sofort in #3 laufen und 500 werfen. **Konsequenz:** PROD-Catchup muss A2 anwenden **bevor** dieser Fix auf PROD geht — oder #3 zuerst fixen. DEV-Deploy heute ist unbedenklich.
+
+### Berührte Dateien
+
+**Code:**
+- `backend/app/main.py` — eine Import-Zeile (L77) + eine `.eq()`-Filterklausel (L2382)
+
+**Docs:**
+- `docs/IMPLEMENTIERT.md` — dieser Eintrag
+- `docs/BUG-AUDIT-2026-05-13.md` — Funde #1 und #24 auf `FIXED 2026-05-18` umgesetzt; Beschreibung #1 um POST-Pfad ergänzt
+- `docs/BUG-FIX-PLAYBOOK.md` §5 „Already-Fixed" — Eintrag für #1 + #24 ergänzt
+
+### Phase-A-Verifikationsteam
+
+Vier parallele Opus-Agenten 2026-05-18, unabhängige Reports:
+
+- **Verifier A** (informiert, Import-Resolution-Fokus): VERDICT still-real, high confidence
+- **Verifier B** (informiert, Code-Path-Fokus): VERDICT still-real, high confidence — fand zusätzlich den POST-Pfad, den die Original-Audit-Beschreibung übersehen hatte
+- **Verifier C** (impartial, Cold-Eyes ohne Audit-Framing): VERDICT still-real, high confidence — unabhängige Bestätigung
+- **Verifier D** (Blast-Radius / Dependency-Mapping): identifizierte #24 als direkt verknüpft, empfahl Bundling; identifizierte #3 als PROD-Reachability-Risiko
+
+Anschließend ein fünfter Opus-Reviewer auf den fertigen Fix-Plan: VERDICT green-with-caveats (Caveats: Line-Number-Drift dokumentieren, PROD-#3-Reachability flaggen — beide adressiert).
