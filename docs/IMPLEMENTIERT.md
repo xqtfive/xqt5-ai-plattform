@@ -1197,3 +1197,117 @@ Nach der Phase-F-Tiefen-Trace (3 Agenten, dokumentiert oben) wies der Red-Team-R
 - `frontend/src/components/AdminDashboard.jsx`: neuer Render-Branch `{rechunkStatus.state === 'cancelled' && t('admin.rechunk.status.cancelled')}` ergänzt zu den existierenden `running`/`done`/`error`-Branches.
 
 Bewusst nicht-i18n-routed bleiben die umgebenden Strings (`'Läuft...'`, `'Jetzt neu chunken'`, „Fertig: …", „Fehler: …") — bestehende hardcoded-German-Strings sind keine Regression-Jagd, aber NEUE Strings (wie der `cancelled`-Branch) müssen i18n-routable sein (CLAUDE.md-Regel).
+
+---
+
+## Bugfix #143 — Image-Gen `parameters`-Bypass (2026-05-18)
+
+**Anlass:** Audit #143 (VERIFIED-MULTI). Per Phase-A heute (3 Opus-Agenten + neue Dispatch-Regeln) als 🔴 kritisch und heute-exploitable verifiziert: jeder authentifizierte User konnte `POST /api/images/generate` mit `body.parameters = {"model":"gpt-image-1","n":10,"size":"1536x1024"}` schicken. Die `_call_openai`/`_call_xai`-Funktionen taten `payload.update(parameters)` ohne Allowlist — User-Werte überschreiben Server-gesetzte `model`/`prompt`/`n`. Cost-Cap-Check rechnete mit dem Admin-konfigurierten (billigen) Modell, Provider berechnete jedoch den überschriebenen (teuren) Modellauf 10× — ~$2 pro Request bei $0.02 Cap-Debit.
+
+### Befund
+
+- `backend/app/image_gen.py:180` (OpenAI) und `:233` (xAI): `payload.update(parameters)` nach Server-gesetztem `{"model": model_name, "prompt": prompt, "n": 1}`. `dict.update` ist last-write-wins → User-Keys clobbern Server-Keys.
+- `backend/app/models.py:221`: `parameters: Dict[str, Any] = {}` — kein `extra='forbid'`, kein Validator, keine Literal-Constraint. Pydantic akzeptierte jede JSON-Struktur.
+- Frontend (`Bilder.jsx`) sendet heute **gar keine** Parameter — der Bypass ist also rein ein API-Surface-Problem (jeder authentifizierte User der curl/Postman kann).
+- Audit-Log loggt das deklarierte Modell, nicht das ausgeführte → Forensik blind, Buchhaltung divergiert von Provider-Billing.
+
+### Fix — zwei-Schicht-Defense
+
+**Layer 1 — Pydantic-Schema (`backend/app/models.py`):**
+
+```python
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+class ImageGenerationParameters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    # v1: keine Felder — Frontend exponiert keine Parameter-Picker;
+    # Cost-Tracking unterstützt nur pricing.type='fixed' (size-variant
+    # Pricing wäre Cost-Bypass-Vektor). Neue Felder hier brauchen jeweils
+    # einen Eintrag in der Allowlist in image_gen.py.
+
+class ImageGenerationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    prompt: str = Field(min_length=1, max_length=2000)
+    model: Optional[str] = None
+    parameters: ImageGenerationParameters = Field(default_factory=ImageGenerationParameters)
+    source: Literal["studio"]
+    chat_id: Optional[str] = None
+    pool_chat_id: Optional[str] = None
+```
+
+Jeder Request mit `parameters={"model":"..."}` oder beliebigen anderen Top-Level-Feldern → HTTP 422 vor Erreichen des Handlers.
+
+**Layer 2 — Runtime-Allowlist (`backend/app/image_gen.py`):**
+
+```python
+_OPENAI_IMAGE_ALLOWED: frozenset = frozenset()
+_XAI_IMAGE_ALLOWED: frozenset = frozenset()
+
+def _filter_provider_parameters(provider, params):
+    if not params: return {}
+    allowed = _OPENAI_IMAGE_ALLOWED if provider == "openai" else _XAI_IMAGE_ALLOWED if provider == "x-ai" else frozenset()
+    filtered = {k: v for k, v in params.items() if k in allowed}
+    dropped = set(params) - set(filtered)
+    if dropped:
+        logger.warning("Image-gen parameters filtered for provider=%s: dropped keys=%s", provider, sorted(dropped))
+    return filtered
+```
+
+Aufgerufen in `generate_image_for_user` direkt nach `provider = model_row["provider"]` (vor `create_pending_image` und `_call_provider`), damit sowohl die persistierte Audit-Row als auch der HTTP-Send den gefilterten Dict reflektieren.
+
+**Route-Handler-Anpassung (`backend/app/main.py:2346`):**
+
+```python
+parameters=body.parameters.model_dump(),  # was: body.parameters
+```
+
+`body.parameters` ist jetzt ein BaseModel; `.model_dump()` gibt den dict an die unchanged `Dict[str, Any]`-Signatur von `generate_image_for_user` weiter (back-compat mit dem dormanten Slash-Command-Pfad).
+
+### Defense-in-depth-Begründung
+
+Layer 1 reicht für die Sicherheit (Pydantic rejected vor dem Handler). Layer 2 ist:
+- **Dokumentation in Code** — die Allowlist-Sets sind explizit, sichtbar, einfach erweiterbar.
+- **Schutz gegen Schema-Drift** — falls jemand später `extra='forbid'` lockert oder ein Feld als `Dict[str, Any]` zurück-typisiert, fängt die Runtime-Filter das.
+- **Audit-Honesty** — die persistierte Parameter-Spalte zeigt was wir tatsächlich gesendet haben (heute: leeres dict; in Zukunft: nur die allowed Keys).
+
+### Auswirkung
+
+| Request | Vor Fix | Nach Fix |
+|---|---|---|
+| `parameters={}` (Standard von `Bilder.jsx`) | OK, leer → unverändert weitergeleitet | OK, leer → unverändert weitergeleitet |
+| `parameters={"size":"1024x1024"}` | Würde an Provider durchgereicht | HTTP 422 (Pydantic `extra='forbid'`) |
+| `parameters={"model":"gpt-image-1","n":10}` (Bypass-Vektor) | Provider rechnet 10× teurer, Cap debitet 1× billig | HTTP 422 — Request abgelehnt |
+| Interner Caller umgeht Pydantic mit nicht-leerem dict | Würde durchgereicht | Runtime-Filter droppt, `logger.warning` zeichnet auf |
+
+### Frontend-Auswirkung
+
+Null. `Bilder.jsx:110-114` und `api.js:773-789` senden nur `{prompt, model, source}` (+ optional `chat_id`/`pool_chat_id`). Alle Felder sind im Schema deklariert. `extra='forbid'` bricht nichts.
+
+### Bewusste Out-of-Scope
+
+- **Allowlist-Erweiterung mit `size`/`quality`/`style`** — braucht (a) Frontend-Picker, (b) `_estimate_cost`-Erweiterung für `pricing.type='size_variant'`. Verifier-D-Analyse: `size` ohne size-variant-Pricing wäre weiter Cost-Bypass.
+- **Andere P7-Findings** (`#158, #159, #165, #182`) — gleiches Pattern (`extra='forbid'`-fehlend), separater koordinierter Sweep.
+- **Audit-Coverage** für IMAGE_GENERATE_SUCCESS — separates Audit-Coverage-Finding.
+
+### Berührte Dateien
+
+**Code:**
+- `backend/app/models.py` — `ConfigDict`-Import, neuer `ImageGenerationParameters`, `ImageGenerationRequest` mit `extra='forbid'` und typisierten `parameters`
+- `backend/app/image_gen.py` — Allowlist-Konstanten, `_filter_provider_parameters`, aufgerufen in `generate_image_for_user`
+- `backend/app/main.py` — `body.parameters.model_dump()` im Route-Handler
+
+**Docs:**
+- `docs/IMPLEMENTIERT.md` — dieser Eintrag
+- `docs/BUG-AUDIT-2026-05-13.md` — #143 auf FIXED 2026-05-18
+- `docs/BUG-FIX-PLAYBOOK.md` — G7-Row geflippt, §5-Eintrag
+- `docs/SECURITY.md` — Parameter-Allowlist als Defense-Layer dokumentiert
+- `docs/CODING-DOKUMENT.md` — neue Regel 9 für nested user-input dicts
+
+### Phase-A-Verifikationsteam (neue Regeln 2. Anwendung)
+
+3 Opus-Agenten parallel:
+- **Informed Verifier** — statische + Runtime-Claims getrennt; lieferte konkrete Exploit-Body + Cost-Berechnung
+- **Red-Team Refuter** — fand `size`-Restrisiko durch `_estimate_cost`-Limitation; bestätigte Frontend sendet nichts
+- **Blast-Radius Analyst** — kartierte P7-Pattern (4 Geschwister-Findings); konkrete Allowlist-Vorschläge per Provider
+
+Konsens: 🔴 Kritisch, heute exploitable, Frontend-impact null. Empty-Allowlist + `extra='forbid'` ist der konservative v1-Schluss.

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Any, Dict, List, Literal, Optional
 
 
@@ -215,10 +215,29 @@ class UploadPoolTextRequest(BaseModel):
 
 
 # Image generation models
+class ImageGenerationParameters(BaseModel):
+    """Provider-specific image-generation parameters.
+
+    Empty in v1 — the platform doesn't expose size/quality/style pickers
+    in the UI yet, and `_estimate_cost` in image_gen.py only handles
+    `pricing.type='fixed'` (so size-variant cost-tracking isn't possible
+    without bypassing the daily cap). When fields are added here later,
+    they must be Literal-typed AND have a matching entry in the per-provider
+    allowlist in image_gen.py (`_OPENAI_IMAGE_ALLOWED` / `_XAI_IMAGE_ALLOWED`).
+
+    `extra='forbid'` makes any unexpected key (e.g. an attacker-injected
+    `"model"` or `"n"`) fail Pydantic validation with HTTP 422 before reaching
+    the route handler. This is the defense the audit #143 fix relies on.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+
 class ImageGenerationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     prompt: str = Field(min_length=1, max_length=2000)
     model: Optional[str] = None
-    parameters: Dict[str, Any] = {}
+    parameters: ImageGenerationParameters = Field(default_factory=ImageGenerationParameters)
     source: Literal["studio"]
     chat_id: Optional[str] = None
     pool_chat_id: Optional[str] = None

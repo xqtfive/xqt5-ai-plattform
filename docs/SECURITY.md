@@ -219,6 +219,8 @@ Konsequenz für `provider_url`: Generierte Bilder sind für die Lebensdauer der 
 
 **Provider-seitige Moderation** ist in v1 der einzige Content-Gate. OpenAI und xAI lehnen gegen ihre Policy verstoßende Prompts auf ihrer Seite ab. Eine eigene Guardrail-Schicht (Llama Guard, Azure Prompt Shields) ist geplant (TODO Abschnitt „Input-/Output-Guardrails"), aber in v1 nicht vorhanden.
 
+**Image-Gen Parameter-Allowlist (2026-05-18, Fix #143).** Der Request-Body `ImageGenerationRequest.parameters` ist eine separate Pydantic-Klasse `ImageGenerationParameters` mit `model_config=ConfigDict(extra='forbid')` und **keinen Feldern in v1**. Jeder Key im `parameters`-Dict wird mit HTTP 422 abgelehnt, bevor er den Route-Handler erreicht. Zusätzlich filtert `image_gen._filter_provider_parameters(provider, params)` zur Laufzeit gegen `_OPENAI_IMAGE_ALLOWED` / `_XAI_IMAGE_ALLOWED` (in v1 beide leer) als defense-in-depth gegen Schema-Drift. Hintergrund: Audit #143 wurde als Cost-Bypass-Vektor verifiziert — User konnte `model`/`n` server-seitig überschreiben und Provider-Billing vom internen Cap-Counter divergieren. Beim Hinzufügen neuer Parameter-Keys müssen beide Schichten gleichzeitig aktualisiert werden, und size-variant Cost-Tracking muss in `_estimate_cost` vorhanden sein bevor `size` allowed wird.
+
 **Geplante Härtung (v2):**
 - Supabase Storage mit ACL als permanenter Bild-Store (ersetzt temporäre Provider-URLs)
 - Optionale Guardrail-Schicht vor dem Provider-Call (Prompt-Klassifikation)

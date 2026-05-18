@@ -25,6 +25,47 @@ logger = logging.getLogger(__name__)
 _PROVIDER_URL_TTL_MINUTES = 60
 
 
+# Per-provider allowlist of accepted user-supplied image-gen parameters.
+# Defense-in-depth ON TOP OF the Pydantic schema in `models.ImageGenerationParameters`
+# (which has no fields in v1 → empty by definition). Audit #143 (2026-05-18): an
+# authenticated user could previously override `model`/`n`/`prompt` via `parameters`
+# and bill the org's provider key for an expensive model while the cost-cap ledger
+# debited the cheap declared model. Both layers must agree — extending one without
+# the other re-opens the gap.
+#
+# When new keys are added here, audit each one for cost-bypass risk against
+# `pricing.type` (size-variant pricing is not implemented as of 2026-05-18).
+_OPENAI_IMAGE_ALLOWED: frozenset = frozenset()
+_XAI_IMAGE_ALLOWED: frozenset = frozenset()
+
+
+def _filter_provider_parameters(provider: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    """Return `params` restricted to the provider's allowlist.
+
+    Logs a warning if any key was dropped — under normal operation that path
+    is unreachable because `models.ImageGenerationParameters` (extra='forbid')
+    rejects unknown keys at the HTTP boundary. A non-empty drop here therefore
+    indicates either (a) a future Pydantic field that wasn't added to the
+    allowlist, or (b) a direct internal caller bypassing the Pydantic layer.
+    """
+    if not params:
+        return {}
+    if provider == "openai":
+        allowed = _OPENAI_IMAGE_ALLOWED
+    elif provider == "x-ai":
+        allowed = _XAI_IMAGE_ALLOWED
+    else:
+        allowed = frozenset()
+    filtered = {k: v for k, v in params.items() if k in allowed}
+    dropped = set(params) - set(filtered)
+    if dropped:
+        logger.warning(
+            "Image-gen parameters filtered for provider=%s: dropped keys=%s",
+            provider, sorted(dropped),
+        )
+    return filtered
+
+
 def _is_moderation_error(body) -> bool:
     """Heuristic: return True if a provider error response indicates a content-policy block."""
     if isinstance(body, dict):
@@ -358,6 +399,13 @@ async def generate_image_for_user(
 
     provider = model_row["provider"]
     pricing = model_row.get("pricing") or {}
+
+    # 1b. Filter user-supplied parameters against the per-provider allowlist
+    # (audit #143). Pydantic in `models.ImageGenerationParameters` already
+    # rejected unknown keys at HTTP boundary; this is defense-in-depth so the
+    # downstream payload and the persisted audit row both reflect exactly what
+    # we send to the provider.
+    parameters = _filter_provider_parameters(provider, parameters)
 
     # 2. Estimate cost
     estimated_cost = _estimate_cost(pricing)

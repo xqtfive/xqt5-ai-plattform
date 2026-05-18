@@ -2343,7 +2343,7 @@ async def generate_image(
         user_id=current_user["id"],
         model=body.model,
         prompt=body.prompt,
-        parameters=body.parameters,
+        parameters=body.parameters.model_dump(),
         source=body.source,
         chat_id=body.chat_id,
         pool_chat_id=body.pool_chat_id,
