@@ -1319,6 +1319,18 @@ async def _run_rechunk_task(admin_user_id: str) -> None:
             "finished_at": datetime.now(timezone.utc).isoformat(),
         }
         logger.info("Re-chunk complete: %s", result)
+    except asyncio.CancelledError:
+        # Triggered by uvicorn graceful-shutdown timeout (SIGTERM with finite
+        # `timeout_graceful_shutdown`). NOT by client TCP close (BackgroundTasks
+        # run inline in the ASGI task after response is sent — not bound to
+        # client liveness). Must re-raise per asyncio convention; swallowing
+        # would break task-cancellation semantics.
+        _rechunk_status = {
+            "state": "cancelled",
+            "cancelled_at": datetime.now(timezone.utc).isoformat(),
+        }
+        logger.warning("Re-chunk background task cancelled (likely worker shutdown)")
+        raise
     except Exception as e:
         _rechunk_status = {"state": "error", "error": str(e)}
         logger.error("Re-chunk background task failed: %s", e, exc_info=True)

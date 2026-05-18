@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 from calendar import monthrange
@@ -1119,6 +1120,20 @@ async def rechunk_all_documents(
                 await process_document(doc_id, text, user_id)
                 processed += 1
                 logger.info("Re-chunked: %s (%s)", filename, doc_id)
+            except asyncio.CancelledError:
+                # In-flight document was mid-rewrite when the outer task was
+                # cancelled (uvicorn graceful-shutdown timeout). Chunks have
+                # already been deleted and status set to 'processing'; without
+                # this branch the document would stay at 'processing' with zero
+                # chunks forever (invisible to RAG). Mark it 'error' so it can
+                # be recognised + retried, then re-raise so the outer loop also
+                # exits cleanly.
+                logger.warning("Re-chunk cancelled mid-document for %s (%s)", filename, doc_id)
+                try:
+                    documents_mod.update_document_status(doc_id, "error", error_message="Re-chunk: cancelled")
+                except Exception as cleanup_err:
+                    logger.error("Failed to mark cancelled doc %s as error: %s", doc_id, cleanup_err)
+                raise
             except Exception as e:
                 logger.error("Re-chunk failed for %s (%s): %s", filename, doc_id, e, exc_info=True)
                 documents_mod.update_document_status(doc_id, "error", error_message=f"Re-chunk: {e}")

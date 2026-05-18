@@ -1106,3 +1106,85 @@ Diese Iteration deckte ein Phase-A-Protokoll-Loch auf: 4 Opus-Verifier waren üb
 - `~/.claude/projects/-home-dri-code/memory/feedback_phase_a_trace_triggers.md` — neue Feedback-Regel über Phase-A-Rigor
 - `~/.claude/projects/-home-dri-code/memory/project_xqt5_bug_fix_workflow.md` — Cross-Reference auf die neue Feedback-Memory ergänzt
 - `~/.claude/projects/-home-dri-code/memory/MEMORY.md` — Index-Eintrag
+
+---
+
+## Bugfix #282 — `_run_rechunk_task` CancelledError-Sibling von #179 (2026-05-18)
+
+**Anlass:** Audit #179 erwähnte als Sibling-Bug dass `_run_rechunk_task` in `main.py` denselben Anti-Pattern hat. Erste Anwendung der neuen Phase-A-Regeln aus `feedback_phase_a_trace_triggers`: 3 Agenten statt 4, mit dediziertem **Framework-Runtime-Researcher**, der Starlette- + uvicorn-Source-Code tracen sollte statt Annahmen zu treffen.
+
+### Phase-A-Erkenntnisse (neuer Schliff)
+
+Framework-Runtime-Researcher zitierte direkt aus dem `.venv`:
+- `starlette/responses.py:163-170` — `BackgroundTasks` läuft inline in der ASGI-Task NACH dem Response-Send, ist NICHT als separater Task gespawnt
+- `uvicorn/server.py:271-297` — graceful-shutdown nutzt `asyncio.wait_for(_wait_tasks_to_complete(), timeout=self.config.timeout_graceful_shutdown)`; bei Timeout iteriert über `self.server_state.tasks` und ruft `t.cancel(...)` auf
+- `uvicorn/config.py:218, 265` — **Default `timeout_graceful_shutdown=None`** → wartet unbegrenzt; Docker SIGKILL (Default 10s nach SIGTERM) tötet den Prozess hart bevor CancelledError fliegt
+- Python-Docs: https://docs.python.org/3.12/library/asyncio-exceptions.html#asyncio.CancelledError — „Changed in version 3.8: CancelledError is now a subclass of BaseException rather than Exception"
+
+**Trigger-Verdict:** CancelledError fliegt in dieser Codebase praktisch NUR wenn `timeout_graceful_shutdown` auf Coolify auf einen endlichen Wert konfiguriert ist UND der Rechunk diese Frist überschreitet. Bei Coolify-Default-SIGKILL-Stop fliegt nichts (Prozess stirbt einfach). Client-TCP-Close cancelt NICHT (BackgroundTasks ist nicht Client-gebunden) — diese Erkenntnis allein hätte die #179-Phase-A-Aussage „auf User-Cancel" wieder widerlegt, wenn wir sie damals so gestellt hätten.
+
+### Befund
+
+- `main.py:1303-1324` `_run_rechunk_task`: `try/except Exception` um den langen `await rag_mod.rechunk_all_documents(...)`. Auf Cancel → cleanup-Writes auf `_rechunk_status` werden übersprungen → Status bleibt für immer `"running"`.
+- `rag.py:1116-1125` per-Dokument-Loop in `rechunk_all_documents`: dieselbe Anti-Pattern. Per-Doc-Statements sind: (1) `DELETE FROM app_document_chunks WHERE document_id=…`, (2) `update_document_status('processing')`, (3) `await process_document(...)`. Keine Transaction-Klammer. Cancel mid-Step-3 → Chunks weg, Status='processing', Dokument für immer unsichtbar in RAG.
+
+### Fix
+
+**`main.py:1303-1324`** — dediziertes Cancel-Branch BEFORE `except Exception`:
+```python
+except asyncio.CancelledError:
+    _rechunk_status = {
+        "state": "cancelled",
+        "cancelled_at": datetime.now(timezone.utc).isoformat(),
+    }
+    logger.warning("Re-chunk background task cancelled (likely worker shutdown)")
+    raise  # asyncio-Discipline: muss re-raised werden
+```
+
+**`rag.py`** — `import asyncio` an Datei-Anfang ergänzt. Per-Doc-Loop in `rechunk_all_documents` neuer Branch:
+```python
+except asyncio.CancelledError:
+    logger.warning("Re-chunk cancelled mid-document for %s (%s)", filename, doc_id)
+    try:
+        documents_mod.update_document_status(doc_id, "error", error_message="Re-chunk: cancelled")
+    except Exception as cleanup_err:
+        logger.error("Failed to mark cancelled doc %s as error: %s", doc_id, cleanup_err)
+    raise
+```
+
+Der nested `try/except` um `update_document_status` ist defensiv — falls auch der Cleanup-Write fehlschlägt (z. B. Supabase-Disconnect), sollen wir die ursprüngliche CancelledError nicht maskieren. Logger.error informiert; raise propagiert die Cancellation sauber.
+
+### Bewusste Out-of-Scope
+
+- **Neue Audit-Konstanten** (`ADMIN_RECHUNK_DONE/FAILED/CANCELLED`) — Audit-Coverage-Gap, separate Finding. Aktuell wird nur `admin.rechunk.start` als String-Literal in `main.py:1336` geloggt; kein Done/Failed/Cancelled-Audit existiert. Klarer Fix-Kandidat für den nächsten Cycle.
+- **Frontend `'cancelled'`-State-Rendering in `AdminDashboard.jsx`** — Polling-Loop terminiert korrekt auf `state !== 'running'`, daher kein UI-Bruch. Visual-Feedback für „cancelled" wäre nice-to-have, kein Blocker.
+- **`#110/#214` multi-worker `_rechunk_status`-Race** — größerer G1-Refactor; wird `_rechunk_status` ggf. obsolete machen. Diese Fix forward-kompatibel gehalten.
+- **uvicorn `timeout_graceful_shutdown`-Konfiguration auf Coolify** — Infrastruktur, nicht Code.
+
+### Auswirkung
+
+| Szenario | Vor Fix | Nach Fix |
+|---|---|---|
+| Coolify-Rebuild während Rechunk (graceful-shutdown timeout endlich, abgelaufen) | `_rechunk_status="running"` bis Prozess-Restart; in-flight Doc auf `status='processing'` mit 0 Chunks für immer | `_rechunk_status="cancelled"` mit Timestamp; in-flight Doc auf `status='error'` mit `error_message='cancelled'`, recoverbar |
+| Coolify-SIGKILL ohne graceful-shutdown | Prozess stirbt, kein Python-Exception | Unverändert — Python-Exception fliegt nicht, Cleanup nicht erreichbar |
+| Reine Rechunk-Fehler (Exception, kein Cancel) | unverändert | unverändert |
+
+### Phase-A-Verifikationsteam (neue Regeln angewendet)
+
+3 Agenten parallel statt 4:
+- **Informed Verifier** — statische + Runtime-Claims getrennt; identifizierte den inneren `rag.py`-Loop als gleich-betroffen
+- **Framework-Runtime-Researcher** — Starlette + uvicorn-Source-Trace mit Datei:Zeile-Zitaten; klärte den realen Trigger-Pfad
+- **Blast-Radius Analyst** — DB-State-Risiken in `rechunk_all_documents` kartiert; Frontend- + Audit-Coverage-Gaps identifiziert
+
+Kein Impartial Verifier diesmal — statisches Pattern war identisch zu #179 (bereits verifiziert), kein neuer Cold-Eyes-Bedarf. Demonstriert neue Regel 7: „Smaller agent counts when bug is simple".
+
+### Berührte Dateien
+
+**Code:**
+- `backend/app/main.py` — neuer `except asyncio.CancelledError`-Branch in `_run_rechunk_task` (asyncio bereits importiert)
+- `backend/app/rag.py` — `import asyncio` ergänzt; neuer `except asyncio.CancelledError`-Branch in `rechunk_all_documents` per-Doc-Loop
+
+**Docs:**
+- `docs/IMPLEMENTIERT.md` — dieser Eintrag
+- `docs/BUG-AUDIT-2026-05-13.md` — #282 zu Spätere Findings, FIXED 2026-05-18
+- `docs/BUG-FIX-PLAYBOOK.md` — G5-Tabelle erweitert, §5-Eintrag
