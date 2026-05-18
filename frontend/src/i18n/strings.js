@@ -14,6 +14,8 @@ const STRINGS = {
     'admin.rag.max_tokens.label': 'Max. Kontext-Token',
     'admin.rag.max_tokens.hint': 'Token-Budget für RAG-Kontext im Prompt (Standard: 6000)',
 
+    'admin.rechunk.status.cancelled': 'Re-Chunking abgebrochen (Worker-Neustart) — kann erneut gestartet werden.',
+
     'admin.rag.section.contextual_retrieval': 'Kontextuelles Retrieval',
     'admin.rag.contextual.description':
       'Stellt jedem Chunk beim Upload einen LLM-generierten Kontextsatz voran. ' +

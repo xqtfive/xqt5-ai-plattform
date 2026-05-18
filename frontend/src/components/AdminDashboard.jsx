@@ -819,6 +819,7 @@ function RetrievalTab() {
             return `Fertig: ${r.processed} verarbeitet, ${r.failed} Fehler, ${r.skipped} übersprungen (${r.total} gesamt)`
           })()}
           {rechunkStatus.state === 'error' && `Fehler: ${rechunkStatus.error}`}
+          {rechunkStatus.state === 'cancelled' && t('admin.rechunk.status.cancelled')}
         </div>
       )}
     </div>

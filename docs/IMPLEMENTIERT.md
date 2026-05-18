@@ -1188,3 +1188,12 @@ Kein Impartial Verifier diesmal — statisches Pattern war identisch zu #179 (be
 - `docs/IMPLEMENTIERT.md` — dieser Eintrag
 - `docs/BUG-AUDIT-2026-05-13.md` — #282 zu Spätere Findings, FIXED 2026-05-18
 - `docs/BUG-FIX-PLAYBOOK.md` — G5-Tabelle erweitert, §5-Eintrag
+
+### Addendum 2026-05-18 — UX-Patch für `cancelled`-State
+
+Nach der Phase-F-Tiefen-Trace (3 Agenten, dokumentiert oben) wies der Red-Team-Refuter darauf hin, dass `frontend/src/components/AdminDashboard.jsx:809-823` keinen Render-Branch für `state === 'cancelled'` hat — Admin würde nach einem Cancel einen leeren Hint-Container sehen statt einer Statusmeldung. Kleines Follow-up:
+
+- `frontend/src/i18n/strings.js`: neue Key `admin.rechunk.status.cancelled = "Re-Chunking abgebrochen (Worker-Neustart) — kann erneut gestartet werden."`
+- `frontend/src/components/AdminDashboard.jsx`: neuer Render-Branch `{rechunkStatus.state === 'cancelled' && t('admin.rechunk.status.cancelled')}` ergänzt zu den existierenden `running`/`done`/`error`-Branches.
+
+Bewusst nicht-i18n-routed bleiben die umgebenden Strings (`'Läuft...'`, `'Jetzt neu chunken'`, „Fertig: …", „Fehler: …") — bestehende hardcoded-German-Strings sind keine Regression-Jagd, aber NEUE Strings (wie der `cancelled`-Branch) müssen i18n-routable sein (CLAUDE.md-Regel).
